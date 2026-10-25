@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NU Shuttle Board — วางแผนตารางเดินรถ ม.นเรศวร</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Taviraj:wght@400;600;700&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --board: #13181F;
+  --board-2: #1B222C;
+  --led: #FFB020;
+  --led-dim: #9A7027;
+  --route-red: #D64550;
+  --route-gold: #C98A12;
+  --paper: #F6F3EC;
+  --panel: #FFFFFF;
+  --ink: #1B1D22;
+  --muted: #6B7280;
+  --line: #E4DFD3;
+  --teal: #1D7A6E;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #14161B; --panel: #1D2028; --ink: #EDEEF0; --muted: #9AA1AC; --line: #2E323C;
+    --board: #0B0E13; --board-2: #12151C;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #14161B; --panel: #1D2028; --ink: #EDEEF0; --muted: #9AA1AC; --line: #2E323C;
+  --board: #0B0E13; --board-2: #12151C;
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "Chakra Petch", sans-serif;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px 70px; }
+h1, h2, .display { font-family: "Taviraj", serif; }
+
+/* ---------- Header ---------- */
+.topbar {
+  background: var(--board); color: #E9E4D8;
+  padding: 18px 20px; display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 3px solid var(--led);
+}
+.topbar .wordmark { display: flex; align-items: baseline; gap: 10px; }
+.topbar .wordmark .bus { font-size: 22px; }
+.topbar h1 { font-size: 21px; margin: 0; font-weight: 700; letter-spacing: .3px; }
+.topbar .sub { font-size: 11.5px; color: #9AA0AC; margin-top: 2px; }
+.topbar .clock { font-family: "Chakra Petch", monospace; font-variant-numeric: tabular-nums; text-align: right; color: var(--led); }
+.topbar .clock .t { font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+.topbar .clock .d { font-size: 10.5px; color: #9AA0AC; }
+.official-link {
+  display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; padding: 7px 13px;
+  background: var(--board); border: 1px solid var(--board-2); border-radius: 5px; color: #E9E4D8;
+  text-decoration: none; font-size: 11.5px;
+}
+
+/* ---------- Section framing ---------- */
+.section { margin-top: 40px; }
+.section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.section-num { font-family: "Taviraj", serif; font-size: 15px; color: var(--route-red); font-weight: 600; }
+.section-head h2 { font-size: 20px; margin: 0; color: var(--ink); }
+.section-sub { font-size: 13px; color: var(--muted); margin: -8px 0 18px; max-width: 620px; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px; }
+
+/* ---------- Scenario controls ---------- */
+.mode-row { display: flex; gap: 10px; margin-bottom: 18px; }
+.mode-btn {
+  flex: 1; padding: 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper);
+  cursor: pointer; text-align: center; font-size: 13.5px; color: var(--muted); font-family: "Chakra Petch";
+}
+.mode-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); font-weight: 600; }
+.mode-panel { display: none; }
+.mode-panel.active { display: block; }
+.field-row { display: flex; align-items: center; gap: 14px; margin: 16px 0 8px; flex-wrap: wrap; }
+.field-row label { font-size: 13.5px; color: var(--muted); flex: 1; min-width: 220px; }
+.field-row input[type=number] {
+  width: 130px; padding: 10px 12px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); font-size: 16px; font-weight: 700; text-align: right;
+  font-family: "Chakra Petch";
+}
+.hint-line { font-size: 11.5px; color: var(--muted); font-family: "Chakra Petch"; margin-top: 6px; }
+.upload-zone {
+  border: 1.5px dashed var(--line); border-radius: 9px; padding: 22px 14px; text-align: center; cursor: pointer;
+}
+.upload-zone:hover { border-color: var(--route-red); }
+.upload-zone input { display: none; }
+.format-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.format-tab {
+  flex: 1; padding: 7px 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--paper);
+  cursor: pointer; text-align: center; font-size: 12.5px; color: var(--muted);
+}
+.format-tab.active { background: var(--route-red); color: white; border-color: var(--route-red); font-weight: 600; }
+.status-line { font-size: 12.5px; margin-top: 10px; padding: 8px 12px; border-radius: 7px; display: none; }
+.status-line.ok { display: block; background: rgba(29,122,110,.12); color: var(--teal); }
+.status-line.err { display: block; background: rgba(214,69,80,.12); color: var(--route-red); }
+.note-line {
+  border-left: 3px solid var(--route-gold); padding: 10px 14px; font-size: 12px; color: var(--ink);
+  margin-top: 14px; background: rgba(201,138,18,.06);
+}
+
+/* ---------- Map ---------- */
+.map-controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.map-controls label { font-size: 13px; color: var(--muted); margin-right: 4px; }
+select {
+  padding: 8px 11px; border-radius: 7px; border: 1px solid var(--line); background: var(--paper);
+  color: var(--ink); font-size: 13.5px; font-family: "Chakra Petch";
+}
+.hour-readout {
+  font-family: "Taviraj", serif; font-weight: 700; color: var(--route-red); min-width: 60px; display: inline-block;
+}
+.stat-strip { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; margin-bottom: 18px; }
+.stat-cell { background: var(--panel); padding: 15px; text-align: center; }
+.stat-cell .v { font-family: "Taviraj", serif; font-size: 24px; font-weight: 700; color: var(--ink); }
+.stat-cell .l { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+svg.map { width: 100%; height: auto; max-height: 640px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; }
+/* แผนที่: จำกัดขนาด แล้ววางสถิติและคำอธิบายสีไว้ข้างแผนที่ (จอแคบจะเรียงต่อกัน) */
+.map-layout { display: grid; grid-template-columns: minmax(0,480px) minmax(0,1fr); grid-template-areas: "map stats" "map legend" "map rank"; grid-template-rows: auto auto 1fr; gap: 0 24px; align-content: start; }
+.map-layout > #mapStats { grid-area: stats; align-self: start; }
+.map-layout > svg.map { grid-area: map; }
+.map-layout > .legend-strip { grid-area: legend; margin-top: 0; align-self: start; }
+@media (max-width: 760px) {
+  .map-layout { grid-template-columns: minmax(0,1fr); grid-template-areas: "stats" "map" "legend" "rank"; grid-template-rows: auto; }
+  .map-layout > .legend-strip { margin-top: 12px; }
+}
+.map-tooltip {
+  display: none; position: fixed; z-index: 500; max-width: 280px;
+  background: var(--board); color: #E9E4D8; border: 1px solid #2E3540; border-radius: 8px;
+  padding: 12px 14px; font-size: 12.5px; box-shadow: 0 10px 28px -10px rgba(0,0,0,.5); cursor: pointer;
+}
+.map-tooltip .tooltip-title { font-family:"Taviraj",serif; font-size: 15px; font-weight: 700; color: var(--led); margin-bottom: 8px; }
+.map-tooltip .tooltip-row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.map-tooltip .tooltip-row b { color: #FFFFFF; }
+.map-tooltip .tooltip-buildings-label { font-size: 11px; color: #9AA0AC; margin-top: 8px; margin-bottom: 5px; }
+.map-tooltip .tooltip-buildings { display: flex; flex-wrap: wrap; gap: 5px; }
+.map-tooltip .tooltip-chip {
+  background: #ffffff1a; border: 1px solid #ffffff2a; border-radius: 4px; padding: 2px 7px; font-size: 11px; color: #E9E4D8;
+}
+.legend-strip { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); align-items: center; }
+.legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
+/* ---------- Timetable (schedule-sheet feel) ---------- */
+table.schedule { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.schedule th {
+  text-align: left; padding: 10px 12px; font-weight: 600; color: var(--muted);
+  border-bottom: 2px solid var(--ink); font-size: 12px;
+}
+table.schedule td { padding: 9px 12px; border-bottom: 1px solid var(--line); }
+table.schedule tr:hover td { background: rgba(0,0,0,.02); }
+.table-scroll { max-height: 440px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.route-pill { display: inline-block; padding: 2px 9px; border-radius: 3px; font-size: 10.5px; font-weight: 600; }
+.route-pill.express { background: rgba(29,122,110,.15); color: var(--teal); }
+.route-pill.loop-r { background: rgba(214,69,80,.13); color: var(--route-red); }
+.route-pill.loop-y { background: rgba(201,138,18,.15); color: var(--route-gold); }
+.route-pill.cvrp { background: rgba(106,61,154,.13); color: #6A3D9A; }
+
+/* ---------- เที่ยวรถตามสีรถ (เพิ่มจาก v3) ---------- */
+.c-red    { --rgb: 214,69,80; }
+.c-yellow { --rgb: 201,138,18; }
+.c-blue   { --rgb: 47,111,191; }
+.c-none   { --rgb: 120,126,138; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .c-blue { --rgb: 96,160,232; }
+  :root:not([data-theme="light"]) .c-none { --rgb: 160,166,178; }
+}
+:root[data-theme="dark"] .c-blue { --rgb: 96,160,232; }
+:root[data-theme="dark"] .c-none { --rgb: 160,166,178; }
+.cdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--rgb)); flex: none; }
+.c-none .cdot { background: transparent; border: 2px dashed rgb(var(--rgb)); width: 11px; height: 11px; }
+.colour-panel { margin-bottom: 18px; }
+.colour-cards { display: grid; grid-template-columns: repeat(auto-fit,minmax(128px,1fr)); gap: 8px; margin-bottom: 14px; }
+.colour-card {
+  text-align: left; cursor: pointer; font-family: "Chakra Petch"; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-left: 5px solid rgb(var(--rgb, 107,114,128));
+  border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px;
+}
+.colour-card:hover:not(:disabled) { background: rgba(var(--rgb, 107,114,128), .08); }
+.colour-card[aria-pressed="true"] { background: rgba(var(--rgb, 107,114,128), .16); border-color: rgb(var(--rgb, 107,114,128)); box-shadow: 0 0 0 1px rgb(var(--rgb, 107,114,128)) inset; }
+.colour-card:disabled { opacity: .5; cursor: default; }
+.colour-card .cc-name { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; }
+.colour-card .cc-n { font-family: "Taviraj", serif; font-size: 26px; font-weight: 700; line-height: 1.15; }
+.colour-card .cc-n small { font-family: "Chakra Petch"; font-size: 11px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.colour-card .cc-sub { font-size: 10.5px; color: var(--muted); line-height: 1.35; }
+.lane-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table.lane-grid { border-collapse: collapse; width: 100%; min-width: 700px; font-size: 12px; font-variant-numeric: tabular-nums; }
+table.lane-grid caption { text-align: left; padding: 9px 12px 6px; font-size: 11.5px; color: var(--muted); caption-side: top; }
+table.lane-grid th, table.lane-grid td { padding: 7px 6px; text-align: center; border-bottom: 1px solid var(--line); }
+table.lane-grid thead th { font-weight: 600; color: var(--muted); border-bottom: 2px solid var(--ink); font-size: 11.5px; }
+table.lane-grid tbody th { text-align: left; padding-left: 12px; font-weight: 600; white-space: nowrap; color: var(--ink); }
+table.lane-grid tbody th .lane-name { display: inline-flex; align-items: center; gap: 7px; }
+table.lane-grid td.has { background: rgba(var(--rgb), var(--a, .3)); font-weight: 700; color: var(--ink); }
+table.lane-grid td.zero { color: var(--muted); opacity: .55; }
+table.lane-grid td.tot { font-weight: 700; border-left: 1px solid var(--line); }
+table.lane-grid tr.ref th, table.lane-grid tr.ref td { color: var(--muted); font-weight: 500; border-top: 2px dashed var(--line); }
+table.lane-grid tr.ref th small { display: block; font-size: 10px; font-weight: 400; }
+.colour-pill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 8px; border-radius: 999px;
+  border: 1px solid rgba(var(--rgb), .55); background: rgba(var(--rgb), .12); color: var(--ink);
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+table.schedule tr.tr-trip td:first-child { box-shadow: inset 5px 0 0 rgb(var(--rgb)); }
+body.no-cvrp .cvrp-only { display: none; }
+.stop-rank { grid-area: rank; margin-top: 18px; align-self: start; }
+.rank-head { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.rank-row { display: grid; grid-template-columns: 22px 46px minmax(0,1fr) 96px; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; border-bottom: 1px solid var(--line); cursor: default; }
+.rank-row .rk { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.rank-row .sid { font-weight: 600; }
+.rank-bar { height: 12px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.rank-bar i { display: block; height: 100%; border-radius: 3px; }
+.rank-row .rv { text-align: right; font-variant-numeric: tabular-nums; }
+.rank-row .rv small { color: var(--muted); margin-left: 4px; }
+.rank-foot { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.tt-empty { padding: 22px; text-align: center; color: var(--muted); font-size: 13px; }
+
+.btn {
+  padding: 10px 18px; border-radius: 7px; border: none; background: var(--ink); color: var(--paper);
+  font-size: 13.5px; cursor: pointer; font-weight: 600; font-family: "Chakra Petch";
+}
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wordmark">
+    <span class="bus">🚌</span>
+    <div>
+      <h1>NU Shuttle Board</h1>
+      <div class="sub">เครื่องมือวางแผนตารางเดินรถจากข้อมูล Demand จริง</div>
+    </div>
+  </div>
+  <div class="clock">
+    <div class="t" id="clockTime">--:--:--</div>
+    <div class="d" id="clockDate">-</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <a class="official-link" href="https://transit.nu.ac.th/" target="_blank" rel="noopener" style="margin-top:26px;display:inline-flex;">📍 ดูตำแหน่งรถสด (ทางการ transit.nu.ac.th)</a>
+
+  <!-- ============ Scenario ============ -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">01</span><h2>จำลองสถานการณ์</h2></div>
+    <div class="section-sub">ใช้ข้อมูลตัวอย่างจากงานวิจัยจริง หรืออัปโหลดตารางเรียนของตัวเอง แล้วปรับกลุ่มเป้าหมายได้ทันที</div>
+    <div class="panel">
+      <div class="mode-row">
+        <div class="mode-btn active" data-mode="demo" onclick="setMode('demo')">ใช้ข้อมูลตัวอย่าง</div>
+        <div class="mode-btn" data-mode="upload" onclick="setMode('upload')">อัปโหลดไฟล์ของตัวเอง</div>
+      </div>
+      <div class="mode-panel active" id="panel-demo">
+        <div class="hint-line">ข้อมูลตัวอย่างจากตารางเรียนจริง (เทอม 1) ครบ 5 วันทำการ</div>
+      </div>
+      <div class="mode-panel" id="panel-upload">
+        <div class="format-tabs">
+          <div class="format-tab active" data-fmt="term1" onclick="setFormat('term1')">รูปแบบรายวิชา (.xlsx)</div>
+          <div class="format-tab" data-fmt="term2" onclick="setFormat('term2')">รูปแบบสรุปการเดินรถ (.csv)</div>
+        </div>
+        <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <input type="file" id="fileInput" accept=".xlsx" onchange="handleFile(this.files[0])">
+          <div style="font-size:26px;">📄</div>
+          <div id="uploadLabel">ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์ (.xlsx)</div>
+        </div>
+        <div id="uploadStatus" class="status-line"></div>
+      </div>
+      <div class="field-row">
+        <label>นิสิตหอใน (คน)</label>
+        <input type="number" id="dormStudents" value="1696" min="0" step="1" oninput="onTargetChange()">
+      </div>
+      <div class="field-row">
+        <label>ที่จอดรถจักรยานยนต์ (คัน)</label>
+        <input type="number" id="motorcycleParking" value="1135" min="0" step="1" oninput="onTargetChange()">
+      </div>
+      <div class="hint-line" id="formulaNote">กลุ่มเป้าหมายสมมติ (Target Population) = นิสิตหอใน − ที่จอดรถ (ข้อสมมติของผู้วิจัย) = <b id="ceilingReadout">561</b> คน</div>
+
+      <div class="field-row" style="margin-top:18px;">
+        <label>สัดส่วน Captive Rider ที่ใช้จริง (Sensitivity Analysis)</label>
+        <select id="captivePercent" onchange="onTargetChange()" style="min-width:130px;">
+          <option value="30">30%</option>
+          <option value="50">50%</option>
+          <option value="70">70%</option>
+          <option value="80">80%</option>
+          <option value="100" selected>100% (กรณีฐาน)</option>
+        </select>
+      </div>
+      <div class="hint-line">กลุ่มเป้าหมายที่ใช้คำนวณจริง = กลุ่มเป้าหมายสมมติ × สัดส่วนที่เลือก = <b id="targetReadout">561</b> คน</div>
+      <div class="note-line">ตัวเลข 561 คน (1,696 − 1,135 ตามที่ผู้วิจัยรายงาน ยังไม่ได้ตรวจยืนยันกับหลักฐาน) เป็นประชากรเป้าหมายตามสมมติฐาน (ไม่ใช่จำนวนที่วัดได้ และไม่ได้พิสูจน์ว่าเป็นขอบเขตบน) — สัดส่วน 30/50/70/80% คือค่าทดสอบความไว (Sensitivity) เพื่อดูผลเมื่อกลุ่มเป้าหมายเปลี่ยน ไม่ได้ชี้ว่าระดับใดใกล้ความจริง ค่า Demand ที่ได้เป็น "การขึ้นรถโดยประมาณ" ที่ปรับสเกลให้เฉลี่ย 1 ครั้งต่อคนต่อวัน</div>
+
+      <div class="field-row" style="margin-top:18px;"><label><b>ประเภทรถและจำนวนคัน (Fleet)</b> — เพิ่มได้หลายประเภท (ค่าเริ่มต้น: รถส้ม 35 ที่นั่ง 16 คัน, รถกอล์ฟ 11 ที่นั่ง 5 คัน รวม 21 คัน — ใช้ค่าต่ำสุดของช่วง 35–40 และ 11–14 ที่นั่ง)</label></div>
+      <div id="fleetEditor"></div>
+      <button type="button" onclick="addFleetType()" style="margin-top:8px;padding:7px 14px;border:1px dashed var(--muted);background:transparent;color:var(--ink);border-radius:6px;cursor:pointer;font-family:'Chakra Petch';">+ เพิ่มประเภทรถ</button>
+      <div class="hint-line" id="fleetSummary"></div>
+      <div class="field-row" style="margin-top:18px;gap:10px;flex-wrap:wrap;">
+        <label style="min-width:260px;"><b>กฎจำนวนรถช่วงวนเส้นทาง:</b> ใช้รถ "เท่าที่จำเป็น" ไม่จำเป็นต้องครบฝูง</label>
+        <span>รอบ/ชม./คัน <input type="number" id="roundsPerHour" value="2" min="1" step="0.5" style="width:70px;" oninput="onTargetChange()"></span>
+        <span>โหลดเป้าหมายสูงสุด (%) <input type="number" id="loadFactor" value="85" min="30" max="100" step="5" style="width:70px;" oninput="onTargetChange()"></span>
+        <span>รถขั้นต่ำ (คัน) <input type="number" id="minCars" value="2" min="1" step="1" style="width:70px;" oninput="onTargetChange()"></span>
+      </div>
+      <div class="field-row" style="margin-top:10px;gap:10px;flex-wrap:wrap;">
+        <label style="min-width:260px;"><b>สมมติฐานเวลา:</b> นับขาไปที่ไหน และรถวิ่งเร็วเท่าไร</label>
+        <span>ขาไปถึงป้ายก่อนคาบ <select id="goingLead" onchange="onTargetChange()"><option value="30" selected>30 นาที (ตามนิยามงานวิจัย)</option><option value="15">15 นาที (ทดสอบความไว)</option><option value="0">0 นาที (ทดสอบความไว: นับที่ชั่วโมงเริ่มคาบ)</option></select></span>
+        <span>ความเร็วเฉลี่ย (กม./ชม.) <input type="number" id="speedKmh" value="40" min="5" step="1" style="width:70px;" oninput="onTargetChange()"></span>
+        <span>เวลาจอดต่อจุด (วินาที) <input type="number" id="dwellSec" value="20" min="0" step="5" style="width:70px;" oninput="onTargetChange()"></span>
+      </div>
+      <div class="field-row" style="margin-top:10px;gap:10px;flex-wrap:wrap;">
+        <label style="min-width:260px;cursor:pointer;"><input type="checkbox" id="roundUp" checked onchange="onTargetChange()"> <b>ปัดจำนวนคนขึ้นเป็นจำนวนเต็ม</b></label>
+      </div>
+      <div class="hint-line">ปัดขึ้นทีละจุดจอด ต่อชั่วโมง ต่อทิศทาง (ขาไป/ขากลับ) หลังปรับสเกลแล้ว ทุกตัวเลขผู้โดยสารในหน้านี้จึงเป็นจำนวนเต็ม และยอดรวมสูงกว่าค่าก่อนปัดเล็กน้อย (ดูยอด Demand ทั้งวันในหัวข้อตารางเดินรถ) ปิดช่องนี้เพื่อดูค่าทศนิยมที่ไม่ปัด</div>
+      <div class="note-line cvrp-only">ค่าตั้งต้น: นิสิตมาถึงจุดขึ้นรถ (P0) ก่อนคาบ 30 นาที รถออกจาก P0 ตามเวลานั้น (เที่ยวเช้าของคาบ 08:00 ออก 07:30) ส่วน 15 และ 0 นาทีใช้ทดสอบความไว (0 นาที = นับขาไปที่ชั่วโมงเริ่มคาบ ซึ่งไม่ตรงกับนิยามของงานวิจัย) ความเร็ว 40 กม./ชม. และเวลาจอดจุดละ 20 วินาทีเป็นสมมติฐานของผู้วิจัย ยังไม่ได้วัดจริง ใช้คำนวณเวลาถึงแต่ละจุด และตรวจว่ารถที่ติดงาน CVRP ไม่ถูกจัดซ้อนกับรถวนเส้นทางในชั่วโมงเดียวกัน</div>
+      <div class="note-line">สูตร: จำนวนรถ = ค่าต่ำสุดที่ทำให้ (ที่นั่งรวมของรถที่ใช้ × รอบ/ชม. × โหลดเป้าหมาย) ≥ Demand ของชั่วโมงนั้น เลือกรถคันใหญ่ก่อน และไม่เกินจำนวนที่ว่างจริง — เป็นสูตรที่ผู้วิจัยพัฒนาเอง (ไม่ใช่สูตรของ Furth & Wilson, 1981 ซึ่งเป็นแบบจำลองจัดสรรรถระหว่างช่วงเวลาและเส้นทาง) ความจุผู้โดยสาร = จำนวนเที่ยวต่อชั่วโมง × ที่นั่งต่อคัน ตามนิยามใน TCRP Report 165 ค่ารอบ/ชม. 2, โหลดเป้าหมาย 85% และขั้นต่ำ 2 คัน เป็นสมมติฐานที่ยังไม่ได้ยืนยัน จึงเปิดให้ปรับ ถ้า Demand เกินความจุรวมทั้งฝูงจะแสดงคำเตือน</div>
+      <div class="note-line cvrp-only">วิธีใช้ฝูงรถผสม: ช่วงรถวนเส้นทาง (Service-Need Rule) ใช้จำนวนคันรวม และเทียบกับความจุเฉลี่ยถ่วงน้ำหนักตามจำนวนคัน ส่วนช่วง CVRP (เช้า/เย็น) ระบบสร้างเส้นทางด้วยความจุของรถคันใหญ่สุด แล้วจัดรถที่เล็กที่สุดที่ยังจุได้ให้แต่ละเส้นทาง (Best-fit) จากรถที่มี หากรถหมดจะแสดงคำเตือน — เป็นวิธีฮิวริสติกเพื่อการสาธิต ไม่ใช่ค่าที่ดีที่สุดที่พิสูจน์แล้ว</div>
+    </div>
+  </div>
+
+  <!-- ============ Map ============ -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">02</span><h2>แผนที่ Demand</h2></div>
+    <div class="panel">
+      <div class="map-controls">
+        <label>วัน</label><select id="daySelect" onchange="renderAll()"></select>
+        <label>ชั่วโมง</label>
+        <input type="range" id="hourSlider" min="7" max="19" value="12" oninput="renderAll()">
+        <span class="hour-readout" id="hourDisplay">11:00</span>
+      </div>
+      <div class="map-layout">
+      <div class="stat-strip" id="mapStats"></div>
+      <svg id="mapSvg" class="map" viewBox="0 0 1200 1500"></svg>
+      <div id="mapTooltip" class="map-tooltip" onclick="hideStopTooltip()"></div>
+      <div class="legend-strip">
+        <span><span class="legend-dot" style="background:#990011"></span>Demand สูงสุด</span>
+        <span><span class="legend-dot" style="background:#F2A93B"></span>ปานกลาง-สูง</span>
+        <span><span class="legend-dot" style="background:#FCE9B0"></span>ต่ำ</span>
+        <span><span style="display:inline-block;width:16px;height:2px;background:#D64550;vertical-align:middle;margin-right:5px"></span>สายสีแดง</span>
+        <span><span style="display:inline-block;width:16px;height:2px;background:#C98A12;vertical-align:middle;margin-right:5px"></span>สายสีเหลือง</span>
+      </div>
+      <div class="stop-rank" id="stopRank"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Timetable ============ -->
+  <div class="section">
+    <div class="section-head"><span class="section-num">03</span><h2>ตารางเดินรถที่แนะนำ</h2></div>
+    <div class="panel">
+      <div class="map-controls">
+        <label>วัน</label><select id="ttDaySelect" onchange="renderTimetable()"></select>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="showRawTime" onchange="renderTimetable()">
+          แสดงเวลาก่อนปัด (เฉพาะช่วงวนเส้นทาง)
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;" title="เปิด = มีเที่ยว CVRP ช่วงเช้า–เย็น (ค่าเริ่มต้น) · ปิด = ทุกเที่ยวเป็นรถวนแดง/เหลือง">
+          <input type="checkbox" id="useCvrp" checked onchange="renderTimetable()">
+          ใช้เที่ยวพิเศษ CVRP เช้า–เย็น
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="groupByColour" onchange="renderTimetable()">
+          จัดกลุ่มตารางตามสีรถ
+        </label>
+        <button class="btn ghost" onclick="downloadTimetableCSV()">ดาวน์โหลด CSV</button>
+        <span class="hint-line" id="csvStatus" role="status" style="margin:0;"></span>
+      </div>
+      <textarea id="csvFallback" hidden readonly aria-label="ข้อความตารางเดินรถสำหรับคัดลอก" style="width:100%;height:150px;margin-bottom:12px;font:12px/1.4 monospace;padding:8px;border:1px solid var(--line);border-radius:7px;background:var(--paper);color:var(--ink);"></textarea>
+      <div class="stat-strip" id="ttStats"></div>
+      <div class="colour-panel" id="ttColour"></div>
+      <div class="table-scroll">
+        <table class="schedule">
+          <thead><tr id="ttHeadRow"><th>เวลาออก</th><th>ประเภท / เส้นทาง</th><th>ผู้โดยสาร</th><th>ใช้ความจุ</th></tr></thead>
+          <tbody id="ttBody"></tbody>
+        </table>
+      </div>
+      <div class="hint-line" id="colourHint" style="margin-top:10px;"></div>
+      <div class="hint-line cvrp-only" style="margin-top:10px;">ช่วงเช้า-เย็น (CVRP/Express) ไม่มี "เวลาก่อนปัด" เพราะเป็นการเรียงลำดับความสำคัญเข้าช่องเวลาคงที่ ไม่ใช่การคำนวณช่วงห่างต่อเนื่องแบบช่วงกลางวัน</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================= GEO DATA ================= */
+const GEO_DATA = {"stops": [{"id": 0, "x": 627896.8, "y": 1850976.6}, {"id": 1, "x": 627675.0, "y": 1851610.0}, {"id": 2, "x": 627584.0, "y": 1851874.0}, {"id": 3, "x": 627532.0, "y": 1851948.0}, {"id": 4, "x": 627465.0, "y": 1852083.0}, {"id": 6, "x": 627383.2, "y": 1852207.6}, {"id": 7, "x": 627386.4, "y": 1852215.1}, {"id": 8, "x": 627245.5, "y": 1852270.5}, {"id": 9, "x": 627119.6, "y": 1852241.0}, {"id": 10, "x": 626950.2, "y": 1852288.5}, {"id": 11, "x": 626862.6, "y": 1852339.3}, {"id": 12, "x": 626808.0, "y": 1852015.0}, {"id": 13, "x": 626837.5, "y": 1851876.8}, {"id": 14, "x": 626896.0, "y": 1851772.0}, {"id": 15, "x": 626983.9, "y": 1851635.0}, {"id": 16, "x": 627133.0, "y": 1851750.0}, {"id": 17, "x": 627056.0, "y": 1851520.0}, {"id": 18, "x": 627141.6, "y": 1851366.9}, {"id": 19, "x": 627209.0, "y": 1851258.0}, {"id": 20, "x": 627767.4, "y": 1851435.8}, {"id": 21, "x": 627775.4, "y": 1851429.7}, {"id": 22, "x": 627711.1, "y": 1851481.1}, {"id": 23, "x": 627413.8, "y": 1851460.3}, {"id": 24, "x": 627165.1, "y": 1851451.5}, {"id": 25, "x": 627457.9, "y": 1851416.3}, {"id": 26, "x": 627254.4, "y": 1852079.9}], "roads": [{"name": "แดง", "points": [[626961.5313946307, 1851672.1249849307], [626976.754332954, 1851644.651489499], [627012.990409285, 1851587.8869082078], [627172.4741313679, 1851680.0138614879], [627124.5209459651, 1851764.6202736818], [626961.5313946307, 1851672.1249849307]]}, {"name": "แดง", "points": [[627744.02620708, 1851501.714892805], [627743.389474087, 1851502.8805098054], [627722.5788508574, 1851536.6553268982], [627701.9372076415, 1851569.9769200706], [627675.1305688104, 1851605.9865601396], [627655.6667410884, 1851636.9202883064], [627654.4060676035, 1851680.681260337], [627654.0379593058, 1851714.207355109], [627641.8870964583, 1851745.0198135194], [627624.415581196, 1851776.2956820745], [627580.3440049965, 1851864.5577659514], [627518.3254028305, 1851980.376174409], [627500.8835598861, 1852006.7796834593], [627492.0066627278, 1852018.2875858834], [627445.2160448803, 1852102.8989750782], [627312.3709745603, 1852030.9159946744], [627294.2627501291, 1852057.6459066554], [627289.6854755707, 1852058.8571190976], [627281.8752144106, 1852058.8102049192], [627276.7336853786, 1852057.1277117499], [627269.2523037506, 1852057.660841448], [627252.7049721028, 1852087.3730199377], [627245.282888223, 1852091.8703724318], [627242.45443389, 1852092.4314507567], [627225.4259922908, 1852119.2503981774], [627238.5111949284, 1852126.430871558], [627219.9406034483, 1852161.0030519739], [627317.4986095898, 1852214.687990508], [627321.7147242673, 1852218.2642624585], [627324.0193344417, 1852221.9116281879], [627334.6837105787, 1852244.767763726], [627324.509363331, 1852250.9826887285], [627267.9119030026, 1852266.9934522912], [627222.0656966437, 1852263.7452513569], [627166.4786476328, 1852249.8684767885], [627101.5520919082, 1852241.5512444275], [627041.1170637165, 1852246.3087459016], [627006.7436909497, 1852255.8470838387], [626982.9283398368, 1852264.457788141], [626956.2623238941, 1852277.3455729343], [626805.008889935, 1852365.6255533292], [626772.0121795221, 1852284.0048352818], [626821.2850662846, 1852256.140064955], [626838.7451585832, 1852240.3892808359], [626855.5692545078, 1852219.8450622035], [626863.7142413117, 1852205.6075180282], [626866.9813292534, 1852194.2310566283], [626872.8250834724, 1852161.8947018664], [626873.0931123575, 1852144.884815179], [626869.5846017222, 1852120.254927798], [626866.0103261371, 1852106.6077935493], [626806.1688783795, 1851991.297631974], [626802.6548171509, 1851967.5759426234], [626801.5518648608, 1851957.494489269], [626803.2650157879, 1851948.916336376], [626814.1226715832, 1851911.8199039514], [626915.9503075142, 1851752.386916963], [626960.2902368952, 1851674.3649593708], [626961.5313946307, 1851672.1249849307]]}, {"name": "แดง", "points": [[626961.5313946307, 1851672.1249849307], [626960.680462376, 1851671.6420931537], [626976.3455643755, 1851643.5341830545], [627012.9189482635, 1851585.9457964792], [627115.935083789, 1851422.8019993766], [627202.3949823047, 1851471.053536538], [627257.7167775722, 1851501.7760305821], [627295.7700441729, 1851502.3348483208], [627432.6838961955, 1851450.9651515377], [627469.6455152007, 1851439.625766857], [627525.6263116271, 1851416.01338596], [627566.9835012784, 1851419.8958808393], [627744.02620708, 1851501.714892805]]}, {"name": "แดง", "points": [[627744.02620708, 1851501.714892805], [627748.0385430277, 1851503.5691901085], [627749.6301962927, 1851501.4316289555], [627780.8305835314, 1851412.0171181594], [627786.7454870734, 1851395.701295975], [627808.4339051301, 1851326.627166716], [627811.9113305863, 1851314.9212684766], [627819.8807689515, 1851274.8336649644], [627832.1149010014, 1851202.7291312255], [627852.6027770346, 1851084.7572129818], [627859.3320876829, 1851016.087405858], [627864.0501331215, 1850977.7965069273], [627865.1040119061, 1850968.3881837153], [627904.0602615895, 1850984.7271925802]]}, {"name": "แดง", "points": [[627744.02620708, 1851501.714892805], [627746.2671638236, 1851497.6125506752], [627767.0657295809, 1851438.2781686701], [627784.1387207893, 1851390.4828370009], [627809.580716562, 1851305.2449377775], [627823.4895738573, 1851231.0034204733], [627839.8605143127, 1851134.3135836732], [627848.326177766, 1851080.8499548351], [627855.0375479663, 1851015.1530773044], [627860.6412860106, 1850967.7831781574], [627861.162809036, 1850954.4762820639], [627861.0936740546, 1850950.495464169], [627870.2165563162, 1850951.2910174401], [627879.3321809645, 1850953.289908005], [627901.1694948819, 1850961.6601222]]}, {"name": "เหลือง", "points": [[627447.6264016286, 1852107.017820659], [627448.0564974389, 1852107.2515308547], [627434.3181980628, 1852132.6862356844], [627426.0792715771, 1852148.6572616266], [627411.3542348375, 1852179.2885423915], [627388.5697681154, 1852209.8713306608], [627368.2579357213, 1852229.9813117627], [627327.0600049662, 1852255.1682967395], [627268.9630182086, 1852271.830680211], [627222.5376921969, 1852268.1661009812], [627163.7963194966, 1852253.7749171637], [627100.1126145286, 1852246.0432074117], [627040.4234028388, 1852251.135501656], [627008.4625316878, 1852260.1928210466], [626985.3138599686, 1852268.477198345], [626960.483676611, 1852280.0547044622], [626934.9695330912, 1852294.848735624], [626838.9964493088, 1852351.088602299], [626790.6401703379, 1852378.5457823277], [626752.5365079208, 1852289.4624327815], [626818.3169173351, 1852252.2823455194], [626835.4407074336, 1852237.1901806989], [626851.7643018859, 1852216.9732792478], [626859.0700101698, 1852204.1345645692], [626862.2080152144, 1852193.5005481045], [626868.058189631, 1852160.0906895746], [626867.9147581392, 1852156.2911491417], [626868.6476871904, 1852144.8994884356], [626865.128294682, 1852122.086300966], [626861.3853696149, 1852108.8510602692], [626801.4301434011, 1851991.7234701035], [626796.8027466531, 1851959.6544639661], [626798.0361419511, 1851947.9353701056], [626809.7236839301, 1851911.0090617568], [626811.0708861512, 1851908.0442080514], [626910.7990374487, 1851752.3147797447], [626957.9887158257, 1851670.1807856595], [627124.5209459651, 1851764.6202736818], [627173.7340973554, 1851677.7504171839], [627010.3590029903, 1851583.2878236882], [627059.9313022697, 1851505.7922528684], [627126.0460742497, 1851399.4916473033], [627164.3306148493, 1851333.8199023206], [627221.0837076968, 1851236.8770501805], [627229.4998633985, 1851219.0894718005], [627464.460634008, 1851362.214195797], [627463.8647688848, 1851378.3969296613], [627450.2859278761, 1851397.97008293], [627463.678402443, 1851437.0298131735], [627472.5028656557, 1851434.2750544548], [627523.989838154, 1851411.791803203], [627568.3392873517, 1851415.5271355435], [627639.2698297822, 1851448.3266651311], [627746.2671638236, 1851497.6125506752], [627754.9272382363, 1851472.906974934], [627784.1387207893, 1851390.4828370009], [627788.7300074009, 1851375.1007039605], [627809.580716562, 1851305.244937777], [627823.4895738573, 1851231.0034204738], [627826.0974548996, 1851215.6007695624], [627838.0666700088, 1851144.9083508716], [627848.326177766, 1851080.8499548351], [627860.6412860106, 1850967.7831781574], [627861.162809036, 1850954.4762820639], [627861.0936740546, 1850950.4954641694], [627870.2165563162, 1850951.2910174401], [627879.3321809645, 1850953.289908005], [627901.1694948819, 1850961.6601222]]}, {"name": "เหลือง", "points": [[627447.6264016286, 1852107.017820659], [627313.5148578029, 1852034.1435126083], [627296.3703299732, 1852059.5166296521], [627290.2091775513, 1852061.5854228293], [627283.352939889, 1852061.7919804326], [627277.5870126283, 1852060.3121880519], [627271.2730780041, 1852060.150394457], [627255.0225031622, 1852088.8733851048], [627246.9734181251, 1852094.0069694046], [627242.2919231529, 1852095.2794986449], [627228.1149888952, 1852117.6975176653], [627242.4422910572, 1852125.587384247], [627223.7876131964, 1852160.3242185477], [627319.3614431396, 1852212.345655029], [627324.1959985936, 1852216.71015353], [627327.0797382625, 1852220.7738996136], [627339.1362464188, 1852247.024178277], [627367.9896395656, 1852229.6906692837], [627387.9676332853, 1852209.8264205763], [627410.9187705679, 1852179.1620537383], [627425.2229064055, 1852149.4366240515], [627432.5794795725, 1852135.1118980274], [627447.6264016286, 1852107.017820659]]}, {"name": "เหลือง", "points": [[627447.6264016286, 1852107.017820659], [627449.1342429034, 1852104.2025376644], [627494.9969943358, 1852021.8978399297], [627521.6475920847, 1851984.0710163647], [627566.8620602223, 1851899.1194702517], [627605.8636553073, 1851824.8658506982], [627627.4029450756, 1851780.4014670253], [627646.0486522741, 1851747.3158778413], [627658.7030300753, 1851715.6806376916], [627660.1646551652, 1851638.5577329933], [627678.3711985163, 1851609.433250126], [627705.2614266502, 1851573.3415409143], [627737.9859796374, 1851520.5206636433], [627748.0385430277, 1851503.5691901085], [627749.6301962927, 1851501.4316289558], [627786.7454870734, 1851395.7012959751], [627811.9113305863, 1851314.9212684766], [627815.8960466661, 1851294.877475977], [627820.0630461761, 1851273.7593731862], [627825.9978267527, 1851238.7814282377], [627830.9801077414, 1851209.417277388], [627852.6027770346, 1851084.7572129818], [627855.9674289242, 1851050.4223369989], [627859.3320876829, 1851016.087405858], [627864.0501331215, 1850977.7965069273], [627865.1040119061, 1850968.3881837153], [627904.0602615895, 1850984.7271925798]]}], "building_to_stop": {"sc4": 25, "sc5": 19, "sc1": 18, "sc2": 24, "sc3": 23, "วิศวะ": 1, "agi7": 2, "agi1": 3, "agi2": 3, "agi": 2, "sitcom": 4, "สระว่ายนำ": 2, "อาคารกีฬาในร่ม": 3, "ปราบ2": 4, "bec": 4, "สังคม": 4, "นิติ": 4, "มนุษย์": 26, "โดม": 8, "สถาปัต": 3, "นานาชาติ": 16, "ธรรมราชาc": 18, "ธรรมราชาa": 18, "ธรรมราชาb": 18, "เอกา": 17, "วิทย์แพทย์": 14, "qs": 16, "เภสัช": 13, "ศึกษา": 26, "หอสมุด": 16, "ปราบไตร": 26, "อาคารมิ่งขวัญ": 26, "โรงพยาบาล": 12, "สาธารณสุข": 14, "พยาบาล": 13, "สหเวช": 13, "ทันตแพทย์": 13, "หอใน": 0, "จุดเริิ่มเส้นทาง": 0, "สนามฟุตบอล": 22}};
+const DEMO_DEMAND = {"อังคาร":{"1":{"7":{"going":0,"return":0,"goingB":189,"goingC":189},"8":{"going":189,"return":0,"goingB":378,"goingC":378},"9":{"going":378,"return":0,"goingB":189,"goingC":189},"10":{"going":189,"return":84,"goingB":72,"goingC":72},"11":{"going":72,"return":59,"goingB":0,"goingC":0},"12":{"going":0,"return":685,"goingB":945,"goingC":945},"13":{"going":945,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":49,"goingC":49},"15":{"going":49,"return":144,"goingB":59,"goingC":59},"16":{"going":59,"return":684,"goingB":0,"goingC":0},"17":{"going":0,"return":228,"goingB":0,"goingC":0},"18":{"going":0,"return":16,"goingB":0,"goingC":0}},"2":{"7":{"going":0,"return":0,"goingB":316,"goingC":316},"8":{"going":316,"return":0,"goingB":39,"goingC":39},"9":{"going":39,"return":0,"goingB":151,"goingC":151},"10":{"going":151,"return":50,"goingB":0,"goingC":0},"12":{"going":0,"return":424,"goingB":663,"goingC":663},"13":{"going":663,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":140,"goingB":308,"goingC":308},"15":{"going":308,"return":204,"goingB":47,"goingC":47},"16":{"going":47,"return":93,"goingB":0,"goingC":0},"17":{"going":0,"return":185,"goingB":0,"goingC":0},"18":{"going":0,"return":368,"goingB":0,"goingC":0},"19":{"going":0,"return":58,"goingB":0,"goingC":0}},"3":{"7":{"going":0,"return":0,"goingB":108,"goingC":108},"8":{"going":108,"return":0,"goingB":116,"goingC":116},"9":{"going":116,"return":0,"goingB":111,"goingC":111},"10":{"going":111,"return":78,"goingB":0,"goingC":0},"12":{"going":0,"return":257,"goingB":311,"goingC":311},"13":{"going":311,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":53,"goingC":53},"15":{"going":53,"return":63,"goingB":0,"goingC":0},"16":{"going":0,"return":53,"goingB":0,"goingC":0},"17":{"going":0,"return":248,"goingB":0,"goingC":0}},"4":{"7":{"going":0,"return":0,"goingB":390,"goingC":390},"8":{"going":390,"return":0,"goingB":136,"goingC":136},"9":{"going":136,"return":0,"goingB":275,"goingC":275},"10":{"going":275,"return":19,"goingB":0,"goingC":0},"12":{"going":0,"return":791,"goingB":761,"goingC":761},"13":{"going":761,"return":0,"goingB":12,"goingC":12},"14":{"going":12,"return":0,"goingB":54,"goingC":54},"15":{"going":54,"return":247,"goingB":0,"goingC":0},"16":{"going":0,"return":260,"goingB":239,"goingC":239},"17":{"going":239,"return":433,"goingB":0,"goingC":0},"19":{"going":0,"return":239,"goingB":0,"goingC":0}},"13":{"7":{"going":0,"return":0,"goingB":440,"goingC":440},"8":{"going":440,"return":0,"goingB":453,"goingC":453},"9":{"going":453,"return":70,"goingB":278,"goingC":278},"10":{"going":278,"return":0,"goingB":0,"goingC":0},"11":{"going":0,"return":109,"goingB":0,"goingC":0},"12":{"going":0,"return":1009,"goingB":1187,"goingC":1187},"13":{"going":1187,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":61,"goingB":41,"goingC":41},"15":{"going":41,"return":147,"goingB":0,"goingC":0},"16":{"going":0,"return":585,"goingB":0,"goingC":0},"17":{"going":0,"return":435,"goingB":0,"goingC":0}},"14":{"7":{"going":0,"return":0,"goingB":200,"goingC":200},"8":{"going":200,"return":0,"goingB":134,"goingC":134},"9":{"going":134,"return":0,"goingB":414,"goingC":414},"10":{"going":414,"return":103,"goingB":0,"goingC":0},"12":{"going":0,"return":726,"goingB":718,"goingC":718},"13":{"going":718,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":347,"goingC":347},"15":{"going":347,"return":322,"goingB":74,"goingC":74},"16":{"going":74,"return":74,"goingB":3,"goingC":3},"17":{"going":3,"return":710,"goingB":0,"goingC":0},"18":{"going":0,"return":3,"goingB":0,"goingC":0}},"16":{"7":{"going":0,"return":0,"goingB":2652,"goingC":2652},"8":{"going":2652,"return":0,"goingB":315,"goingC":315},"9":{"going":315,"return":0,"goingB":801,"goingC":801},"10":{"going":801,"return":224,"goingB":12,"goingC":12},"11":{"going":12,"return":24,"goingB":0,"goingC":0},"12":{"going":0,"return":3743,"goingB":4219,"goingC":4219},"13":{"going":4219,"return":0,"goingB":114,"goingC":114},"14":{"going":114,"return":0,"goingB":637,"goingC":637},"15":{"going":637,"return":1130,"goingB":0,"goingC":0},"16":{"going":0,"return":163,"goingB":0,"goingC":0},"17":{"going":0,"return":3436,"goingB":0,"goingC":0}},"18":{"7":{"going":0,"return":0,"goingB":100,"goingC":100},"8":{"going":100,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":0,"goingB":452,"goingC":452},"10":{"going":452,"return":77,"goingB":0,"goingC":0},"12":{"going":0,"return":474,"goingB":634,"goingC":634},"13":{"going":634,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":9,"goingB":103,"goingC":103},"15":{"going":103,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":270,"goingB":0,"goingC":0},"17":{"going":0,"return":479,"goingB":0,"goingC":0}},"19":{"7":{"going":0,"return":0,"goingB":209,"goingC":209},"8":{"going":209,"return":0,"goingB":22,"goingC":22},"9":{"going":22,"return":0,"goingB":128,"goingC":128},"10":{"going":128,"return":150,"goingB":0,"goingC":0},"12":{"going":0,"return":226,"goingB":150,"goingC":150},"13":{"going":150,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":12,"goingC":12},"15":{"going":12,"return":122,"goingB":0,"goingC":0},"17":{"going":0,"return":65,"goingB":0,"goingC":0}},"22":{"14":{"going":0,"return":0,"goingB":753,"goingC":753},"15":{"going":753,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":753,"goingB":0,"goingC":0}},"23":{"7":{"going":0,"return":0,"goingB":29,"goingC":29},"8":{"going":29,"return":0,"goingB":249,"goingC":249},"9":{"going":249,"return":0,"goingB":6,"goingC":6},"10":{"going":6,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":261,"goingB":157,"goingC":157},"13":{"going":157,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":157,"goingB":0,"goingC":0}},"24":{"7":{"going":0,"return":0,"goingB":165,"goingC":165},"8":{"going":165,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":0,"goingB":187,"goingC":187},"10":{"going":187,"return":25,"goingB":0,"goingC":0},"12":{"going":0,"return":290,"goingB":433,"goingC":433},"13":{"going":433,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":179,"goingC":179},"15":{"going":179,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":664,"goingB":0,"goingC":0}},"25":{"7":{"going":0,"return":0,"goingB":118,"goingC":118},"8":{"going":118,"return":0,"goingB":288,"goingC":288},"9":{"going":288,"return":0,"goingB":0,"goingC":0},"10":{"going":0,"return":22,"goingB":0,"goingC":0},"12":{"going":0,"return":329,"goingB":381,"goingC":381},"13":{"going":381,"return":0,"goingB":0,"goingC":0},"15":{"going":0,"return":98,"goingB":93,"goingC":93},"16":{"going":93,"return":283,"goingB":0,"goingC":0},"17":{"going":0,"return":93,"goingB":0,"goingC":0}},"26":{"7":{"going":0,"return":0,"goingB":4078,"goingC":4078},"8":{"going":4078,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":0,"goingB":880,"goingC":880},"10":{"going":880,"return":37,"goingB":0,"goingC":0},"11":{"going":0,"return":20,"goingB":0,"goingC":0},"12":{"going":0,"return":4362,"goingB":3574,"goingC":3574},"13":{"going":3574,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":323,"goingC":323},"15":{"going":323,"return":2104,"goingB":139,"goingC":139},"16":{"going":139,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":1766,"goingB":0,"goingC":0},"18":{"going":0,"return":149,"goingB":0,"goingC":0},"19":{"going":0,"return":2,"goingB":0,"goingC":0}}},"พุธ":{"1":{"7":{"going":0,"return":0,"goingB":189,"goingC":189},"8":{"going":189,"return":0,"goingB":728,"goingC":728},"9":{"going":728,"return":0,"goingB":231,"goingC":231},"10":{"going":231,"return":195,"goingB":0,"goingC":0},"11":{"going":0,"return":115,"goingB":0,"goingC":0},"12":{"going":0,"return":835,"goingB":1069,"goingC":1069},"13":{"going":1069,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":2,"goingB":120,"goingC":120},"15":{"going":120,"return":118,"goingB":32,"goingC":32},"16":{"going":32,"return":870,"goingB":0,"goingC":0},"17":{"going":0,"return":115,"goingB":0,"goingC":0},"18":{"going":0,"return":116,"goingB":0,"goingC":0}},"2":{"7":{"going":0,"return":0,"goingB":217,"goingC":217},"8":{"going":217,"return":0,"goingB":240,"goingC":240},"9":{"going":240,"return":0,"goingB":217,"goingC":217},"10":{"going":217,"return":4,"goingB":0,"goingC":0},"12":{"going":0,"return":602,"goingB":482,"goingC":482},"13":{"going":562,"return":0,"goingB":80,"goingC":80},"15":{"going":0,"return":4,"goingB":33,"goingC":33},"16":{"going":33,"return":395,"goingB":184,"goingC":184},"17":{"going":184,"return":112,"goingB":0,"goingC":0},"18":{"going":0,"return":94,"goingB":0,"goingC":0},"19":{"going":0,"return":67,"goingB":0,"goingC":0},"20":{"going":0,"return":164,"goingB":0,"goingC":0}},"3":{"7":{"going":0,"return":0,"goingB":330,"goingC":330},"8":{"going":330,"return":0,"goingB":244,"goingC":244},"9":{"going":244,"return":44,"goingB":0,"goingC":0},"10":{"going":0,"return":0,"goingB":50,"goingC":50},"11":{"going":50,"return":50,"goingB":0,"goingC":0},"12":{"going":0,"return":530,"goingB":313,"goingC":313},"13":{"going":313,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":85,"goingC":85},"15":{"going":85,"return":50,"goingB":0,"goingC":0},"17":{"going":0,"return":345,"goingB":0,"goingC":0}},"4":{"7":{"going":0,"return":0,"goingB":371,"goingC":371},"8":{"going":371,"return":0,"goingB":165,"goingC":165},"9":{"going":165,"return":0,"goingB":349,"goingC":349},"10":{"going":349,"return":89,"goingB":0,"goingC":0},"12":{"going":0,"return":698,"goingB":679,"goingC":679},"13":{"going":679,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":96,"goingC":96},"15":{"going":96,"return":83,"goingB":0,"goingC":0},"16":{"going":0,"return":140,"goingB":0,"goingC":0},"17":{"going":0,"return":641,"goingB":0,"goingC":0},"18":{"going":0,"return":54,"goingB":0,"goingC":0}},"13":{"7":{"going":0,"return":0,"goingB":557,"goingC":557},"8":{"going":606,"return":0,"goingB":467,"goingC":467},"9":{"going":418,"return":0,"goingB":101,"goingC":101},"10":{"going":101,"return":107,"goingB":97,"goingC":97},"11":{"going":97,"return":59,"goingB":0,"goingC":0},"12":{"going":0,"return":1015,"goingB":1225,"goingC":1225},"13":{"going":1225,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":28,"goingC":28},"15":{"going":28,"return":238,"goingB":0,"goingC":0},"16":{"going":0,"return":418,"goingB":0,"goingC":0},"17":{"going":0,"return":569,"goingB":0,"goingC":0},"18":{"going":0,"return":28,"goingB":0,"goingC":0}},"14":{"7":{"going":0,"return":0,"goingB":406,"goingC":406},"8":{"going":406,"return":0,"goingB":140,"goingC":140},"9":{"going":140,"return":112,"goingB":731,"goingC":731},"10":{"going":731,"return":37,"goingB":0,"goingC":0},"11":{"going":0,"return":118,"goingB":0,"goingC":0},"12":{"going":0,"return":902,"goingB":1332,"goingC":1332},"13":{"going":1332,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":18,"goingC":18},"15":{"going":18,"return":686,"goingB":174,"goingC":174},"16":{"going":174,"return":584,"goingB":110,"goingC":110},"17":{"going":110,"return":287,"goingB":0,"goingC":0},"19":{"going":0,"return":110,"goingB":0,"goingC":0}},"16":{"7":{"going":0,"return":0,"goingB":2867,"goingC":2867},"8":{"going":2867,"return":0,"goingB":838,"goingC":838},"9":{"going":838,"return":626,"goingB":1276,"goingC":1276},"10":{"going":1276,"return":90,"goingB":0,"goingC":0},"12":{"going":0,"return":4281,"goingB":4064,"goingC":4064},"13":{"going":4064,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":98,"goingB":218,"goingC":218},"15":{"going":218,"return":1501,"goingB":58,"goingC":58},"16":{"going":58,"return":447,"goingB":0,"goingC":0},"17":{"going":0,"return":2375,"goingB":0,"goingC":0}},"18":{"7":{"going":0,"return":0,"goingB":505,"goingC":505},"8":{"going":505,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":371,"goingB":628,"goingC":628},"10":{"going":628,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":737,"goingB":418,"goingC":418},"13":{"going":418,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":87,"goingB":620,"goingC":620},"15":{"going":620,"return":135,"goingB":97,"goingC":97},"16":{"going":97,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":954,"goingB":0,"goingC":0}},"19":{"7":{"going":0,"return":0,"goingB":268,"goingC":268},"8":{"going":268,"return":0,"goingB":51,"goingC":51},"9":{"going":51,"return":177,"goingB":193,"goingC":193},"10":{"going":193,"return":26,"goingB":0,"goingC":0},"12":{"going":0,"return":300,"goingB":308,"goingC":308},"13":{"going":308,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":76,"goingC":76},"15":{"going":76,"return":150,"goingB":0,"goingC":0},"16":{"going":0,"return":29,"goingB":0,"goingC":0},"17":{"going":0,"return":187,"goingB":0,"goingC":0}},"22":{"7":{"going":0,"return":0,"goingB":27,"goingC":27},"8":{"going":27,"return":0,"goingB":0,"goingC":0},"10":{"going":0,"return":27,"goingB":0,"goingC":0},"12":{"going":0,"return":0,"goingB":27,"goingC":27},"13":{"going":27,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":399,"goingC":399},"15":{"going":399,"return":27,"goingB":0,"goingC":0},"17":{"going":0,"return":399,"goingB":0,"goingC":0}},"23":{"8":{"going":0,"return":0,"goingB":141,"goingC":141},"9":{"going":141,"return":0,"goingB":120,"goingC":120},"10":{"going":120,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":264,"goingB":142,"goingC":142},"13":{"going":142,"return":0,"goingB":74,"goingC":74},"14":{"going":74,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":125,"goingB":0,"goingC":0},"17":{"going":0,"return":102,"goingB":0,"goingC":0}},"24":{"7":{"going":0,"return":0,"goingB":356,"goingC":356},"8":{"going":356,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":0,"goingB":214,"goingC":214},"10":{"going":214,"return":124,"goingB":0,"goingC":0},"12":{"going":0,"return":548,"goingB":400,"goingC":400},"13":{"going":400,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":92,"goingC":92},"15":{"going":92,"return":353,"goingB":547,"goingC":547},"16":{"going":547,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":725,"goingB":0,"goingC":0}},"25":{"7":{"going":0,"return":0,"goingB":73,"goingC":73},"8":{"going":73,"return":0,"goingB":340,"goingC":340},"9":{"going":340,"return":0,"goingB":0,"goingC":0},"10":{"going":0,"return":12,"goingB":0,"goingC":0},"12":{"going":0,"return":426,"goingB":444,"goingC":444},"13":{"going":444,"return":0,"goingB":0,"goingC":0},"15":{"going":0,"return":0,"goingB":53,"goingC":53},"16":{"going":53,"return":232,"goingB":0,"goingC":0},"17":{"going":0,"return":140,"goingB":0,"goingC":0}},"26":{"7":{"going":0,"return":0,"goingB":2333,"goingC":2333},"8":{"going":2333,"return":0,"goingB":190,"goingC":190},"9":{"going":190,"return":671,"goingB":441,"goingC":441},"10":{"going":441,"return":206,"goingB":43,"goingC":43},"11":{"going":43,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":2010,"goingB":1780,"goingC":1780},"13":{"going":1780,"return":0,"goingB":57,"goingC":57},"14":{"going":57,"return":38,"goingB":631,"goingC":631},"15":{"going":631,"return":398,"goingB":39,"goingC":39},"16":{"going":39,"return":739,"goingB":0,"goingC":0},"17":{"going":0,"return":1363,"goingB":0,"goingC":0},"19":{"going":0,"return":2,"goingB":0,"goingC":0}}},"จันทร์":{"1":{"7":{"going":0,"return":0,"goingB":58,"goingC":58},"8":{"going":58,"return":0,"goingB":678,"goingC":678},"9":{"going":678,"return":0,"goingB":239,"goingC":239},"10":{"going":239,"return":0,"goingB":88,"goingC":88},"11":{"going":88,"return":117,"goingB":0,"goingC":0},"12":{"going":0,"return":946,"goingB":879,"goingC":879},"13":{"going":879,"return":0,"goingB":28,"goingC":28},"14":{"going":28,"return":0,"goingB":287,"goingC":287},"15":{"going":287,"return":186,"goingB":32,"goingC":32},"16":{"going":32,"return":666,"goingB":0,"goingC":0},"17":{"going":0,"return":122,"goingB":0,"goingC":0},"18":{"going":0,"return":211,"goingB":0,"goingC":0}},"2":{"7":{"going":0,"return":0,"goingB":421,"goingC":421},"8":{"going":421,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":0,"goingB":190,"goingC":190},"10":{"going":190,"return":30,"goingB":0,"goingC":0},"12":{"going":0,"return":548,"goingB":542,"goingC":542},"13":{"going":542,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":149,"goingC":149},"15":{"going":149,"return":117,"goingB":11,"goingC":11},"16":{"going":11,"return":294,"goingB":0,"goingC":0},"17":{"going":0,"return":51,"goingB":117,"goingC":117},"18":{"going":117,"return":204,"goingB":0,"goingC":0},"19":{"going":0,"return":9,"goingB":0,"goingC":0},"20":{"going":0,"return":117,"goingB":0,"goingC":0}},"3":{"7":{"going":0,"return":0,"goingB":202,"goingC":202},"8":{"going":202,"return":0,"goingB":161,"goingC":161},"9":{"going":161,"return":0,"goingB":173,"goingC":173},"10":{"going":173,"return":111,"goingB":25,"goingC":25},"11":{"going":25,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":450,"goingB":359,"goingC":359},"13":{"going":359,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":76,"goingC":76},"15":{"going":76,"return":106,"goingB":0,"goingC":0},"16":{"going":0,"return":55,"goingB":0,"goingC":0},"17":{"going":0,"return":136,"goingB":0,"goingC":0},"18":{"going":0,"return":138,"goingB":0,"goingC":0}},"4":{"7":{"going":0,"return":0,"goingB":44,"goingC":44},"8":{"going":44,"return":0,"goingB":293,"goingC":293},"9":{"going":293,"return":0,"goingB":382,"goingC":382},"10":{"going":382,"return":7,"goingB":0,"goingC":0},"12":{"going":0,"return":693,"goingB":779,"goingC":779},"13":{"going":779,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":65,"goingC":65},"15":{"going":65,"return":166,"goingB":0,"goingC":0},"16":{"going":0,"return":184,"goingB":0,"goingC":0},"17":{"going":0,"return":529,"goingB":0,"goingC":0}},"13":{"7":{"going":0,"return":0,"goingB":463,"goingC":463},"8":{"going":463,"return":0,"goingB":431,"goingC":431},"9":{"going":431,"return":55,"goingB":158,"goingC":158},"10":{"going":158,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":1077,"goingB":1050,"goingC":1050},"13":{"going":1050,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":38,"goingB":55,"goingC":55},"15":{"going":55,"return":134,"goingB":0,"goingC":0},"16":{"going":0,"return":446,"goingB":0,"goingC":0},"17":{"going":0,"return":379,"goingB":0,"goingC":0},"18":{"going":0,"return":53,"goingB":0,"goingC":0}},"14":{"7":{"going":0,"return":0,"goingB":286,"goingC":286},"8":{"going":286,"return":0,"goingB":332,"goingC":332},"9":{"going":332,"return":0,"goingB":136,"goingC":136},"10":{"going":136,"return":4,"goingB":0,"goingC":0},"12":{"going":0,"return":707,"goingB":677,"goingC":677},"13":{"going":677,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":73,"goingC":73},"15":{"going":73,"return":105,"goingB":18,"goingC":18},"16":{"going":18,"return":98,"goingB":0,"goingC":0},"17":{"going":0,"return":598,"goingB":0,"goingC":0},"18":{"going":0,"return":18,"goingB":0,"goingC":0}},"16":{"7":{"going":0,"return":0,"goingB":2394,"goingC":2394},"8":{"going":2394,"return":0,"goingB":750,"goingC":750},"9":{"going":750,"return":0,"goingB":1140,"goingC":1140},"10":{"going":1140,"return":122,"goingB":0,"goingC":0},"12":{"going":0,"return":4242,"goingB":3876,"goingC":3876},"13":{"going":3876,"return":29,"goingB":124,"goingC":124},"14":{"going":124,"return":83,"goingB":297,"goingC":297},"15":{"going":297,"return":985,"goingB":0,"goingC":0},"16":{"going":0,"return":477,"goingB":0,"goingC":0},"17":{"going":0,"return":2600,"goingB":0,"goingC":0}},"18":{"7":{"going":0,"return":0,"goingB":630,"goingC":630},"8":{"going":630,"return":0,"goingB":111,"goingC":111},"9":{"going":111,"return":0,"goingB":76,"goingC":76},"10":{"going":76,"return":452,"goingB":0,"goingC":0},"12":{"going":0,"return":328,"goingB":414,"goingC":414},"13":{"going":414,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":105,"goingC":105},"15":{"going":105,"return":247,"goingB":466,"goingC":466},"16":{"going":466,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":744,"goingB":0,"goingC":0}},"19":{"7":{"going":0,"return":0,"goingB":195,"goingC":195},"8":{"going":195,"return":0,"goingB":4,"goingC":4},"9":{"going":4,"return":0,"goingB":103,"goingC":103},"10":{"going":103,"return":103,"goingB":0,"goingC":0},"12":{"going":0,"return":205,"goingB":369,"goingC":369},"13":{"going":369,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":12,"goingC":12},"15":{"going":12,"return":220,"goingB":0,"goingC":0},"16":{"going":0,"return":9,"goingB":0,"goingC":0},"17":{"going":0,"return":83,"goingB":0,"goingC":0}},"22":{"14":{"going":0,"return":0,"goingB":651,"goingC":651},"15":{"going":651,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":651,"goingB":0,"goingC":0}},"23":{"7":{"going":0,"return":0,"goingB":50,"goingC":50},"8":{"going":50,"return":0,"goingB":66,"goingC":66},"9":{"going":66,"return":0,"goingB":69,"goingC":69},"10":{"going":69,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":345,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":29,"goingC":29},"15":{"going":29,"return":0,"goingB":0,"goingC":0},"18":{"going":0,"return":29,"goingB":0,"goingC":0}},"24":{"7":{"going":0,"return":0,"goingB":494,"goingC":494},"8":{"going":494,"return":0,"goingB":4,"goingC":4},"9":{"going":4,"return":0,"goingB":181,"goingC":181},"10":{"going":181,"return":50,"goingB":0,"goingC":0},"12":{"going":0,"return":750,"goingB":614,"goingC":614},"13":{"going":614,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":39,"goingC":39},"15":{"going":39,"return":99,"goingB":0,"goingC":0},"17":{"going":0,"return":514,"goingB":0,"goingC":0}},"25":{"7":{"going":0,"return":0,"goingB":150,"goingC":150},"8":{"going":150,"return":0,"goingB":98,"goingC":98},"9":{"going":98,"return":0,"goingB":0,"goingC":0},"10":{"going":0,"return":66,"goingB":0,"goingC":0},"12":{"going":0,"return":350,"goingB":456,"goingC":456},"13":{"going":456,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":48,"goingC":48},"15":{"going":48,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":376,"goingB":0,"goingC":0},"17":{"going":0,"return":127,"goingB":0,"goingC":0}},"26":{"7":{"going":0,"return":0,"goingB":1571,"goingC":1571},"8":{"going":1571,"return":0,"goingB":684,"goingC":684},"9":{"going":684,"return":12,"goingB":423,"goingC":423},"10":{"going":423,"return":302,"goingB":0,"goingC":0},"12":{"going":0,"return":2119,"goingB":2652,"goingC":2652},"13":{"going":2652,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":11,"goingB":304,"goingC":304},"15":{"going":304,"return":1090,"goingB":0,"goingC":0},"17":{"going":0,"return":1927,"goingB":0,"goingC":0},"18":{"going":0,"return":24,"goingB":0,"goingC":0}}},"พฤหัสบดี":{"1":{"7":{"going":0,"return":0,"goingB":40,"goingC":40},"8":{"going":40,"return":0,"goingB":462,"goingC":462},"9":{"going":462,"return":0,"goingB":222,"goingC":222},"10":{"going":222,"return":87,"goingB":0,"goingC":0},"11":{"going":0,"return":107,"goingB":0,"goingC":0},"12":{"going":0,"return":483,"goingB":1091,"goingC":1091},"13":{"going":1091,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":18,"goingC":18},"15":{"going":18,"return":152,"goingB":99,"goingC":99},"16":{"going":99,"return":669,"goingB":0,"goingC":0},"17":{"going":0,"return":260,"goingB":0,"goingC":0},"18":{"going":0,"return":71,"goingB":0,"goingC":0}},"2":{"7":{"going":0,"return":0,"goingB":204,"goingC":204},"8":{"going":204,"return":0,"goingB":140,"goingC":140},"9":{"going":140,"return":111,"goingB":266,"goingC":266},"10":{"going":266,"return":16,"goingB":0,"goingC":0},"12":{"going":0,"return":496,"goingB":771,"goingC":771},"13":{"going":771,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":54,"goingC":54},"15":{"going":54,"return":133,"goingB":100,"goingC":100},"16":{"going":100,"return":410,"goingB":0,"goingC":0},"17":{"going":0,"return":157,"goingB":0,"goingC":0},"18":{"going":0,"return":80,"goingB":0,"goingC":0},"19":{"going":0,"return":117,"goingB":0,"goingC":0}},"3":{"7":{"going":0,"return":0,"goingB":76,"goingC":76},"8":{"going":76,"return":0,"goingB":101,"goingC":101},"9":{"going":101,"return":0,"goingB":106,"goingC":106},"10":{"going":106,"return":15,"goingB":86,"goingC":86},"11":{"going":86,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":354,"goingB":345,"goingC":345},"13":{"going":345,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":15,"goingC":15},"15":{"going":15,"return":56,"goingB":0,"goingC":0},"17":{"going":0,"return":264,"goingB":0,"goingC":0},"18":{"going":0,"return":40,"goingB":0,"goingC":0}},"4":{"7":{"going":0,"return":0,"goingB":584,"goingC":584},"8":{"going":584,"return":0,"goingB":49,"goingC":49},"9":{"going":49,"return":0,"goingB":298,"goingC":298},"10":{"going":298,"return":154,"goingB":0,"goingC":0},"11":{"going":0,"return":39,"goingB":0,"goingC":0},"12":{"going":0,"return":602,"goingB":304,"goingC":304},"13":{"going":304,"return":96,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":130,"goingC":130},"15":{"going":130,"return":71,"goingB":0,"goingC":0},"16":{"going":0,"return":170,"goingB":239,"goingC":239},"17":{"going":239,"return":213,"goingB":0,"goingC":0},"19":{"going":0,"return":239,"goingB":0,"goingC":0}},"13":{"7":{"going":0,"return":0,"goingB":635,"goingC":635},"8":{"going":635,"return":0,"goingB":481,"goingC":481},"9":{"going":481,"return":61,"goingB":108,"goingC":108},"10":{"going":108,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":1165,"goingB":1038,"goingC":1038},"13":{"going":1038,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":55,"goingC":55},"15":{"going":55,"return":273,"goingB":0,"goingC":0},"16":{"going":0,"return":307,"goingB":0,"goingC":0},"17":{"going":0,"return":459,"goingB":0,"goingC":0},"19":{"going":0,"return":53,"goingB":0,"goingC":0}},"14":{"7":{"going":0,"return":0,"goingB":349,"goingC":349},"8":{"going":349,"return":0,"goingB":31,"goingC":31},"9":{"going":31,"return":0,"goingB":497,"goingC":497},"10":{"going":497,"return":148,"goingB":0,"goingC":0},"12":{"going":0,"return":761,"goingB":546,"goingC":546},"13":{"going":546,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":113,"goingC":113},"15":{"going":113,"return":252,"goingB":0,"goingC":0},"16":{"going":0,"return":294,"goingB":2,"goingC":2},"17":{"going":2,"return":113,"goingB":0,"goingC":0},"18":{"going":0,"return":2,"goingB":0,"goingC":0}},"16":{"7":{"going":0,"return":0,"goingB":2588,"goingC":2588},"8":{"going":2588,"return":0,"goingB":377,"goingC":377},"9":{"going":377,"return":20,"goingB":680,"goingC":680},"10":{"going":680,"return":436,"goingB":58,"goingC":58},"11":{"going":58,"return":39,"goingB":0,"goingC":0},"12":{"going":0,"return":3063,"goingB":2975,"goingC":2975},"13":{"going":2975,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":82,"goingB":491,"goingC":491},"15":{"going":491,"return":2001,"goingB":29,"goingC":29},"16":{"going":29,"return":204,"goingB":0,"goingC":0},"17":{"going":0,"return":1098,"goingB":0,"goingC":0}},"18":{"7":{"going":0,"return":0,"goingB":468,"goingC":468},"8":{"going":468,"return":0,"goingB":31,"goingC":31},"9":{"going":31,"return":258,"goingB":98,"goingC":98},"10":{"going":98,"return":75,"goingB":0,"goingC":0},"12":{"going":0,"return":261,"goingB":589,"goingC":589},"13":{"going":589,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":171,"goingC":171},"15":{"going":171,"return":179,"goingB":89,"goingC":89},"16":{"going":89,"return":69,"goingB":0,"goingC":0},"17":{"going":0,"return":531,"goingB":0,"goingC":0}},"19":{"7":{"going":0,"return":0,"goingB":243,"goingC":243},"8":{"going":243,"return":0,"goingB":42,"goingC":42},"9":{"going":42,"return":93,"goingB":83,"goingC":83},"10":{"going":83,"return":81,"goingB":0,"goingC":0},"11":{"going":0,"return":0,"goingB":208,"goingC":208},"12":{"going":208,"return":279,"goingB":209,"goingC":209},"13":{"going":209,"return":208,"goingB":0,"goingC":0},"14":{"going":0,"return":12,"goingB":86,"goingC":86},"15":{"going":86,"return":130,"goingB":99,"goingC":99},"16":{"going":99,"return":86,"goingB":45,"goingC":45},"17":{"going":45,"return":127,"goingB":0,"goingC":0},"20":{"going":0,"return":45,"goingB":0,"goingC":0}},"23":{"8":{"going":0,"return":0,"goingB":174,"goingC":174},"9":{"going":174,"return":0,"goingB":51,"goingC":51},"10":{"going":51,"return":0,"goingB":18,"goingC":18},"11":{"going":18,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":243,"goingB":149,"goingC":149},"13":{"going":149,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":131,"goingB":0,"goingC":0},"17":{"going":0,"return":18,"goingB":0,"goingC":0}},"24":{"7":{"going":0,"return":0,"goingB":208,"goingC":208},"8":{"going":208,"return":0,"goingB":17,"goingC":17},"9":{"going":17,"return":0,"goingB":274,"goingC":274},"10":{"going":274,"return":17,"goingB":0,"goingC":0},"12":{"going":0,"return":425,"goingB":277,"goingC":277},"13":{"going":277,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":61,"goingC":61},"15":{"going":61,"return":160,"goingB":444,"goingC":444},"16":{"going":444,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":634,"goingB":0,"goingC":0}},"25":{"7":{"going":0,"return":0,"goingB":72,"goingC":72},"8":{"going":72,"return":0,"goingB":203,"goingC":203},"9":{"going":203,"return":72,"goingB":237,"goingC":237},"10":{"going":237,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":440,"goingB":398,"goingC":398},"13":{"going":398,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":306,"goingB":0,"goingC":0},"17":{"going":0,"return":93,"goingB":0,"goingC":0}},"26":{"7":{"going":0,"return":0,"goingB":4880,"goingC":4880},"8":{"going":4880,"return":0,"goingB":47,"goingC":47},"9":{"going":47,"return":0,"goingB":456,"goingC":456},"10":{"going":456,"return":875,"goingB":39,"goingC":39},"11":{"going":39,"return":338,"goingB":0,"goingC":0},"12":{"going":0,"return":3113,"goingB":3464,"goingC":3464},"13":{"going":3464,"return":237,"goingB":23,"goingC":23},"14":{"going":23,"return":64,"goingB":37,"goingC":37},"15":{"going":37,"return":2558,"goingB":139,"goingC":139},"16":{"going":139,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":948,"goingB":0,"goingC":0},"18":{"going":0,"return":139,"goingB":0,"goingC":0}}},"ศุกร์":{"1":{"8":{"going":0,"return":0,"goingB":832,"goingC":832},"9":{"going":832,"return":0,"goingB":245,"goingC":245},"10":{"going":245,"return":0,"goingB":0,"goingC":0},"11":{"going":0,"return":36,"goingB":0,"goingC":0},"12":{"going":0,"return":1034,"goingB":658,"goingC":658},"13":{"going":658,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":88,"goingC":88},"15":{"going":88,"return":96,"goingB":0,"goingC":0},"16":{"going":0,"return":511,"goingB":0,"goingC":0},"17":{"going":0,"return":139,"goingB":0,"goingC":0}},"2":{"7":{"going":0,"return":0,"goingB":328,"goingC":328},"8":{"going":328,"return":0,"goingB":341,"goingC":341},"9":{"going":341,"return":82,"goingB":95,"goingC":95},"10":{"going":95,"return":1,"goingB":0,"goingC":0},"11":{"going":0,"return":36,"goingB":0,"goingC":0},"12":{"going":0,"return":564,"goingB":596,"goingC":596},"13":{"going":596,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":30,"goingC":30},"15":{"going":30,"return":181,"goingB":29,"goingC":29},"16":{"going":29,"return":266,"goingB":0,"goingC":0},"17":{"going":0,"return":74,"goingB":0,"goingC":0},"18":{"going":0,"return":139,"goingB":0,"goingC":0},"19":{"going":0,"return":50,"goingB":0,"goingC":0}},"3":{"7":{"going":0,"return":0,"goingB":191,"goingC":191},"8":{"going":191,"return":0,"goingB":56,"goingC":56},"9":{"going":56,"return":0,"goingB":116,"goingC":116},"10":{"going":116,"return":0,"goingB":0,"goingC":0},"11":{"going":0,"return":56,"goingB":0,"goingC":0},"12":{"going":0,"return":307,"goingB":179,"goingC":179},"13":{"going":179,"return":0,"goingB":0,"goingC":0},"15":{"going":0,"return":56,"goingB":0,"goingC":0},"17":{"going":0,"return":90,"goingB":0,"goingC":0},"18":{"going":0,"return":33,"goingB":0,"goingC":0}},"4":{"7":{"going":0,"return":0,"goingB":412,"goingC":412},"8":{"going":412,"return":0,"goingB":117,"goingC":117},"9":{"going":117,"return":0,"goingB":297,"goingC":297},"10":{"going":297,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":805,"goingB":278,"goingC":278},"13":{"going":278,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":60,"goingC":60},"15":{"going":60,"return":158,"goingB":0,"goingC":0},"16":{"going":0,"return":135,"goingB":0,"goingC":0},"17":{"going":0,"return":154,"goingB":0,"goingC":0}},"13":{"7":{"going":0,"return":0,"goingB":626,"goingC":626},"8":{"going":626,"return":0,"goingB":390,"goingC":390},"9":{"going":390,"return":0,"goingB":345,"goingC":345},"10":{"going":345,"return":115,"goingB":0,"goingC":0},"12":{"going":0,"return":1188,"goingB":1205,"goingC":1205},"13":{"going":1205,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":52,"goingB":55,"goingC":55},"15":{"going":55,"return":123,"goingB":0,"goingC":0},"16":{"going":0,"return":746,"goingB":0,"goingC":0},"17":{"going":0,"return":332,"goingB":0,"goingC":0}},"14":{"7":{"going":0,"return":0,"goingB":535,"goingC":535},"8":{"going":535,"return":0,"goingB":117,"goingC":117},"9":{"going":117,"return":4,"goingB":174,"goingC":174},"10":{"going":174,"return":360,"goingB":0,"goingC":0},"11":{"going":0,"return":48,"goingB":0,"goingC":0},"12":{"going":0,"return":365,"goingB":561,"goingC":561},"13":{"going":561,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":16,"goingC":16},"15":{"going":16,"return":399,"goingB":0,"goingC":0},"16":{"going":0,"return":116,"goingB":0,"goingC":0},"17":{"going":0,"return":124,"goingB":0,"goingC":0}},"16":{"7":{"going":0,"return":0,"goingB":2310,"goingC":2310},"8":{"going":2310,"return":0,"goingB":1140,"goingC":1140},"9":{"going":1140,"return":0,"goingB":791,"goingC":791},"10":{"going":791,"return":617,"goingB":55,"goingC":55},"11":{"going":55,"return":99,"goingB":0,"goingC":0},"12":{"going":0,"return":3596,"goingB":3457,"goingC":3457},"13":{"going":3457,"return":59,"goingB":86,"goingC":86},"14":{"going":86,"return":172,"goingB":374,"goingC":374},"15":{"going":374,"return":2089,"goingB":92,"goingC":92},"16":{"going":92,"return":986,"goingB":0,"goingC":0},"17":{"going":0,"return":569,"goingB":0,"goingC":0}},"18":{"7":{"going":0,"return":0,"goingB":262,"goingC":262},"8":{"going":262,"return":0,"goingB":528,"goingC":528},"9":{"going":528,"return":0,"goingB":0,"goingC":0},"10":{"going":0,"return":129,"goingB":0,"goingC":0},"12":{"going":0,"return":579,"goingB":782,"goingC":782},"13":{"going":782,"return":0,"goingB":0,"goingC":0},"15":{"going":0,"return":782,"goingB":0,"goingC":0}},"19":{"7":{"going":0,"return":0,"goingB":124,"goingC":124},"8":{"going":124,"return":0,"goingB":3,"goingC":3},"9":{"going":3,"return":4,"goingB":145,"goingC":145},"10":{"going":145,"return":98,"goingB":0,"goingC":0},"12":{"going":0,"return":161,"goingB":212,"goingC":212},"13":{"going":212,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":153,"goingC":153},"15":{"going":153,"return":196,"goingB":0,"goingC":0},"16":{"going":0,"return":16,"goingB":0,"goingC":0},"17":{"going":0,"return":153,"goingB":0,"goingC":0}},"22":{"7":{"going":0,"return":0,"goingB":58,"goingC":58},"8":{"going":58,"return":0,"goingB":0,"goingC":0},"10":{"going":0,"return":58,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":205,"goingC":205},"15":{"going":205,"return":0,"goingB":0,"goingC":0},"17":{"going":0,"return":205,"goingB":0,"goingC":0}},"23":{"7":{"going":0,"return":0,"goingB":69,"goingC":69},"8":{"going":69,"return":0,"goingB":126,"goingC":126},"9":{"going":126,"return":0,"goingB":45,"goingC":45},"10":{"going":45,"return":69,"goingB":0,"goingC":0},"12":{"going":0,"return":152,"goingB":211,"goingC":211},"13":{"going":211,"return":0,"goingB":0,"goingC":0},"15":{"going":0,"return":2,"goingB":0,"goingC":0},"16":{"going":0,"return":209,"goingB":0,"goingC":0}},"24":{"7":{"going":0,"return":0,"goingB":448,"goingC":448},"8":{"going":448,"return":0,"goingB":0,"goingC":0},"9":{"going":0,"return":39,"goingB":224,"goingC":224},"10":{"going":224,"return":72,"goingB":0,"goingC":0},"12":{"going":0,"return":566,"goingB":398,"goingC":398},"13":{"going":398,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":36,"goingB":43,"goingC":43},"15":{"going":43,"return":153,"goingB":0,"goingC":0},"16":{"going":0,"return":67,"goingB":0,"goingC":0},"17":{"going":0,"return":177,"goingB":0,"goingC":0}},"25":{"7":{"going":0,"return":0,"goingB":212,"goingC":212},"8":{"going":212,"return":0,"goingB":211,"goingC":211},"9":{"going":211,"return":212,"goingB":87,"goingC":87},"10":{"going":87,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":298,"goingB":190,"goingC":190},"13":{"going":190,"return":0,"goingB":0,"goingC":0},"14":{"going":0,"return":0,"goingB":93,"goingC":93},"15":{"going":93,"return":77,"goingB":0,"goingC":0},"16":{"going":0,"return":113,"goingB":0,"goingC":0},"17":{"going":0,"return":93,"goingB":0,"goingC":0}},"26":{"7":{"going":0,"return":0,"goingB":2531,"goingC":2531},"8":{"going":2531,"return":0,"goingB":150,"goingC":150},"9":{"going":150,"return":0,"goingB":209,"goingC":209},"10":{"going":209,"return":264,"goingB":32,"goingC":32},"11":{"going":32,"return":268,"goingB":0,"goingC":0},"12":{"going":0,"return":2057,"goingB":1368,"goingC":1368},"13":{"going":1368,"return":0,"goingB":28,"goingC":28},"14":{"going":28,"return":27,"goingB":155,"goingC":155},"15":{"going":155,"return":609,"goingB":290,"goingC":290},"16":{"going":290,"return":434,"goingB":0,"goingC":0},"17":{"going":0,"return":785,"goingB":0,"goingC":0}}},"undefined":{"1":{"8":{"going":0,"return":0,"goingB":215,"goingC":215},"9":{"going":215,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":215,"goingB":96,"goingC":96},"13":{"going":96,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":96,"goingB":0,"goingC":0}},"2":{"9":{"going":0,"return":0,"goingB":1,"goingC":1},"10":{"going":1,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":1,"goingB":1,"goingC":1},"13":{"going":1,"return":0,"goingB":0,"goingC":0},"16":{"going":0,"return":1,"goingB":0,"goingC":0}},"16":{"8":{"going":0,"return":0,"goingB":121,"goingC":121},"9":{"going":121,"return":0,"goingB":0,"goingC":0},"12":{"going":0,"return":121,"goingB":0,"goingC":0}},"19":{"7":{"going":0,"return":0,"goingB":12,"goingC":12},"8":{"going":12,"return":0,"goingB":0,"goingC":0},"18":{"going":0,"return":12,"goingB":0,"goingC":0}}}};
+</script>
+<script>
+/* ================================================================
+   BUILDING/ROOM NAME MAPPING (same logic as validated Python pipeline)
+   ================================================================ */
+const PREFIX_MAP_T1 = {
+  'QS':'qs','HU':'มนุษย์','ED':'ศึกษา','NUIC':'นานาชาติ','EN':'วิศวะ','MD':'วิทย์แพทย์',
+  'ARC':'สถาปัต','PH':'เภสัช','AHS':'สหเวช','BEC':'bec','DT':'ทันตแพทย์','LAW':'นิติ',
+  'EE':'วิศวะ','CE':'วิศวะ','IE':'วิศวะ','AN':'agi','ARL':'agi',
+  'Pharma':'เภสัช', /* v3: ห้อง Pharma ภาค 1 เดิมไม่ถูกจับคู่ (ภาค 2 จับคู่แล้ว) */
+};
+function roomToBuildingTerm1(room) {
+  room = (room||'').trim();
+  if (room.startsWith('ปราบไตรจักร2') || room.startsWith('ปราบ2')) return 'ปราบ2';
+  if (room.startsWith('ปราบไตรจักร') || room.startsWith('ปราบไตร')) return 'ปราบไตร';
+  if (room.startsWith('AG')) return 'agi';
+  if (room.startsWith('สนามกีฬาฟุตบ')) return 'สนามฟุตบอล'; /* v3: สมมติว่าเป็นสนามเดียวกับจุด P22 (ยังไม่ได้ยืนยันกับแผนที่) */
+  let m = room.match(/^SC\s*([1-5])/);
+  if (m) return 'sc' + m[1];
+  m = room.match(/^([A-Za-z]+)/);
+  if (m && PREFIX_MAP_T1[m[1]]) return PREFIX_MAP_T1[m[1]];
+  return null;
+}
+const BLDG_MAP_T2 = {
+  'QS':'qs','EN':'วิศวะ','EE':'วิศวะ','CE':'วิศวะ','IE':'วิศวะ','ARC':'สถาปัต','MD':'วิทย์แพทย์',
+  'PH':'เภสัช','BEC':'bec','NUIC':'นานาชาติ','AHS':'สหเวช','DT':'ทันตแพทย์','LAW':'นิติ',
+  'ARL':'agi','AN':'agi','เอกาทศรถ':'เอกา',
+};
+function mapBuildingTerm2(building) {
+  const b = (building||'').trim();
+  if (b.startsWith('AG')) return 'agi';
+  if (b.startsWith('ED')) return 'ศึกษา';
+  if (b.startsWith('HU')) return 'มนุษย์';
+  if (b.startsWith('Pharma')) return 'เภสัช';
+  if (b.startsWith('ปราบไตรจักร2')) return 'ปราบ2';
+  if (b === 'ปราบไตรจักร') return 'ปราบไตร';
+  let m = b.match(/^SC\s*([1-5])/);
+  if (m) return 'sc' + m[1];
+  if (BLDG_MAP_T2[b]) return BLDG_MAP_T2[b];
+  return null;
+}
+
+/* ================================================================
+   PARSING: Term 1 (regex) / Term 2 (CSV + forward-fill)
+   ================================================================ */
+const DAY_RE = /(MO|TU|WE|TH|FR|SA|SU)\s+(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})/g;
+const TAIL_RE = /(\d+)\s*\((\d+)\/(\d+)\)\s+(\d+)\s+(\d+)\s+(\d+)\s+([WN])\s*$/;
+const DAY_TH = {MO:'จันทร์',TU:'อังคาร',WE:'พุธ',TH:'พฤหัสบดี',FR:'ศุกร์'};
+
+function parseTerm1Text(rows) {
+  const segments = []; let skipped = 0;
+  for (const text of rows) {
+    if (!text || typeof text !== 'string' || text.startsWith('[หน้า')) continue;
+    const tail = TAIL_RE.exec(text);
+    if (!tail) { skipped++; continue; }
+    if (tail[7] !== 'W') continue;
+    const enrolled = parseInt(tail[5]);
+    const body = text.slice(0, tail.index);
+    const matches = [...body.matchAll(DAY_RE)];
+    if (!matches.length) continue;
+    matches.forEach((m, i) => {
+      const day = DAY_TH[m[1]];
+      const start_h=+m[2], start_m=+m[3], end_h=+m[4], end_m=+m[5];
+      const roomStart = m.index + m[0].length;
+      const roomEnd = i+1 < matches.length ? matches[i+1].index : body.length;
+      const room = body.slice(roomStart, roomEnd).trim();
+      segments.push({day, start_h, start_m, end_h, end_m, room, enrolled});
+    });
+  }
+  return {segments, skipped};
+}
+
+const DAY_MAP_T2 = {'จันทร์':'จันทร์','อังคาร':'อังคาร','พุธ':'พุธ','พฤ':'พฤหัสบดี','พฤหัส':'พฤหัสบดี','พฤหัสบดี':'พฤหัสบดี','ศุกร์':'ศุกร์'};
+function parsePeriod(s) {
+  const parts = s.trim().split('-');
+  if (parts.length !== 2) return null;
+  function side(x) { x=x.trim(); if (x.includes('.')) { const [h,m]=x.split('.'); return [+h,+m]; } return [+x,0]; }
+  const [sh,sm] = side(parts[0]); const [eh,em] = side(parts[1]);
+  if ([sh,sm,eh,em].some(isNaN)) return null;
+  return {sh,sm,eh,em};
+}
+function parseTerm2Rows(rows) {
+  const segments = []; let curB=null, curR=null;
+  for (const row of rows) {
+    if (!row || row.length<5) continue;
+    let [b,r,period,count,day] = row.map(x=>(x==null?'':String(x)).trim());
+    if (b) curB=b; if (r) curR=r;
+    if (!period || count==='' || !day) continue;
+    const dayTh = DAY_MAP_T2[day];
+    if (!dayTh) continue;
+    const p = parsePeriod(period);
+    if (!p) continue;
+    segments.push({day:dayTh, start_h:p.sh, start_m:p.sm, end_h:p.eh, end_m:p.em, room:curR, building:curB, enrolled: parseInt(count)||0});
+  }
+  return segments;
+}
+
+/* ================================================================
+   DEMAND COMPUTATION + TRANSITION DEDUP (10-min window)
+   ================================================================ */
+const TRANSITION_GAP_MIN = 10;
+const WALK_TO_STOP_MIN = 10; /* เวลาเดินจากห้องเรียนถึงป้ายรถหลังเลิกเรียน (นาที) —
+  99.5% ของคาบเรียนจบที่นาที :50 พอดี บวก 10 นาทีจะตกไปอยู่ชั่วโมงถัดไป (ชม.+1:00 น.)
+  ซึ่งตรงกับเวลาที่คนจริงๆ เดินมาถึงป้ายรถ ไม่ใช่ตอนกริ่งเลิกเรียนพอดี */
+const DAYS = ['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์'];
+const GOING_LEAD_B_MIN = 15; /* ขาไปถึงป้ายล่วงหน้า 15 นาทีก่อนคาบเริ่ม (ทดสอบความไว) */
+const GOING_LEAD_C_MIN = 30; /* ขาไปมาถึงจุดขึ้นรถ (P0) ล่วงหน้า 30 นาทีก่อนคาบเริ่ม = นิยามของงานวิจัย (ค่าตั้งต้น) */
+function goingKey() { const el=document.getElementById('goingLead'); const v = el ? +el.value : GOING_LEAD_C_MIN; return v>=GOING_LEAD_C_MIN ? 'goingC' : (v>=GOING_LEAD_B_MIN ? 'goingB' : 'going'); }
+
+/* ปัดจำนวนคนขึ้นเป็นจำนวนเต็ม: ทำที่หน่วยเล็กสุดคือ จุดจอด × ชั่วโมง × ทิศทาง หลังปรับสเกล (ผลรวมทุกตัวเลขจึงตรงกัน)
+   1e-9 กันค่าทศนิยมคลาดเคลื่อน เช่น 21.000000000004 ที่ไม่ควรถูกปัดเป็น 22 */
+function roundUpOn() { const el=document.getElementById('roundUp'); return el ? el.checked : true; }
+function ceilP(x) { return Math.ceil(x - 1e-9); }
+function peopleOf(x) { return roundUpOn() ? ceilP(x) : x; }
+function fmtP(x) { return roundUpOn() ? String(ceilP(x)) : x.toFixed(1); }
+function cellPeople(v) {
+  const g = ((v[goingKey()] !== undefined) ? v[goingKey()] : v.going) * APP_STATE.scale;
+  const r = v.return * APP_STATE.scale;
+  return {g: peopleOf(g), r: peopleOf(r)};
+}
+function computeStopDemand(segments, roomToBuildingFn) {
+  const byDayRoom = new Map();
+  let matched=0, total=0;
+  for (const seg of segments) {
+    total++;
+    const bName = roomToBuildingFn(seg);
+    if (!bName || !(bName in GEO_DATA.building_to_stop)) continue;
+    matched++;
+    const stopId = GEO_DATA.building_to_stop[bName];
+    const rec = {stopId, start_min:seg.start_h*60+seg.start_m, end_min:seg.end_h*60+seg.end_m, start_h:seg.start_h, end_h:seg.end_h, enrolled:seg.enrolled};
+    const key = seg.day+'|'+seg.room;
+    if (!byDayRoom.has(key)) byDayRoom.set(key, []);
+    byDayRoom.get(key).push(rec);
+  }
+  const stopDemand = {};
+  const cell = (d, sid, h) => {
+    if (!stopDemand[d]) stopDemand[d] = {};
+    if (!stopDemand[d][sid]) stopDemand[d][sid] = {};
+    if (!stopDemand[d][sid][h]) stopDemand[d][sid][h] = {going:0, return:0, goingB:0, goingC:0};
+    return stopDemand[d][sid][h];
+  };
+  for (const [key, recs] of byDayRoom.entries()) {
+    const day = key.split('|')[0];
+    const starts = recs.map(r=>r.start_min).sort((a,b)=>a-b);
+    const ends = recs.map(r=>r.end_min).sort((a,b)=>a-b);
+    for (const r of recs) {
+      const chainedIn = ends.some(e => (r.start_min-e)>0 && (r.start_min-e)<=TRANSITION_GAP_MIN);
+      if (!chainedIn) {
+        /* going = นับที่ชั่วโมงเริ่มคาบ (0 นาที); goingB = นับล่วงหน้า 15 นาที; goingC = นับล่วงหน้า 30 นาที (นิยามของงานวิจัย)
+           ผลรวมของทั้งสามแบบเท่ากัน จึงไม่กระทบตัวคูณปรับสเกล */
+        cell(day, r.stopId, r.start_h).going += r.enrolled;
+        cell(day, r.stopId, Math.floor((r.start_min - GOING_LEAD_B_MIN)/60)).goingB += r.enrolled;
+        cell(day, r.stopId, Math.floor((r.start_min - GOING_LEAD_C_MIN)/60)).goingC += r.enrolled;
+      }
+      const chainedOut = starts.some(s => (s-r.end_min)>0 && (s-r.end_min)<=TRANSITION_GAP_MIN);
+      if (!chainedOut) {
+        /* เวลาที่ "ถึงป้ายรถจริง" = เวลาเลิกเรียน + เวลาเดิน แล้วค่อยหาว่าอยู่ชั่วโมงไหน */
+        const arrivalAtStopMin = r.end_min + WALK_TO_STOP_MIN;
+        cell(day, r.stopId, Math.floor(arrivalAtStopMin / 60)).return += r.enrolled;
+      }
+    }
+  }
+  return {stopDemand, matched, total};
+}
+
+function computeRawTotal(stopDemand) {
+  let raw = 0;
+  for (const day of DAYS) {
+    if (!stopDemand[day]) continue;
+    for (const sid in stopDemand[day]) for (const h in stopDemand[day][sid]) {
+      raw += stopDemand[day][sid][h].going + stopDemand[day][sid][h].return;
+    }
+  }
+  return raw;
+}
+
+/* ================================================================
+   SERVICE-NEED RULE + CLARKE-WRIGHT SAVINGS CVRP
+   ================================================================ */
+function svcParams(){ return {rounds:Math.max(0.5,+document.getElementById('roundsPerHour').value||2), lf:Math.min(1,Math.max(0.3,(+document.getElementById('loadFactor').value||85)/100)), min:Math.max(1,Math.round(+document.getElementById('minCars').value||2))}; }
+/* เลือกรถเท่าที่จำเป็น: n(h) = MIN(N, MAX(n_min, CEILING(D(h) / (c x r x LF)))) โดยไล่รถคันใหญ่ก่อน
+   สูตรของผู้วิจัยเอง (ไม่ใช่สูตรของ Furth & Wilson) ค่า c, r, LF, n_min เป็นสมมติฐานที่ยังไม่ได้ยืนยัน
+   listOverride = รถที่ว่างจริงในชั่วโมงนั้น (หักรถที่ติดงาน CVRP แล้ว) */
+function pickServiceVehicles(D, listOverride) {
+  const {rounds,lf,min}=svcParams();
+  let list;
+  if (listOverride) list = listOverride.slice();
+  else { list=[]; fleetClean().forEach((f,ti)=>{for(let i=0;i<f.count;i++) list.push({name:f.name,cap:f.cap,ti});}); }
+  list.sort((a,b)=>b.cap-a.cap);
+  const used=[]; let sup=0;
+  for (const v of list) { if (used.length>=min && sup>=D) break; used.push(v); sup+=v.cap*rounds*lf; }
+  const n=used.length;
+  const seats=used.reduce((a,v)=>a+v.cap,0);
+  return {n, used, avgCap:n?seats/n:getCapacity(), short: (n<min) || sup<D-1e-9, supply:sup, rounds, lf};
+}
+function stopXY(id) { const s = GEO_DATA.stops.find(s=>s.id===id); return s?[s.x,s.y]:[0,0]; }
+function dist(a,b) { const [x1,y1]=stopXY(a),[x2,y2]=stopXY(b); return Math.hypot(x1-x2,y1-y2); }
+
+function solveCVRP(demandObj, depot=0, capacity=27) {
+  const dedicated=[], remaining={};
+  for (const sidStr in demandObj) {
+    const sid=+sidStr, d=demandObj[sidStr];
+    if (d>capacity) {
+      const full=Math.floor(d/capacity), leftover=Math.round((d-full*capacity)*10)/10;
+      for (let i=0;i<full;i++) dedicated.push({stop:sid, load:capacity});
+      if (leftover>0) remaining[sid]=leftover;
+    } else remaining[sid]=d;
+  }
+  const customers = Object.keys(remaining).map(Number);
+  const routeOwner={}, routeStops={}, routeLoad={};
+  customers.forEach(c=>{routeOwner[c]=c; routeStops[c]=[c]; routeLoad[c]=remaining[c];});
+  const savings=[];
+  for (let i=0;i<customers.length;i++) for (let j=i+1;j<customers.length;j++) {
+    const a=customers[i], b=customers[j];
+    savings.push([dist(depot,a)+dist(depot,b)-dist(a,b), a, b]);
+  }
+  savings.sort((x,y)=>y[0]-x[0]);
+  function canMerge(i,j) {
+    const ri=routeOwner[i], rj=routeOwner[j];
+    if (ri===rj) return false;
+    const si=routeStops[ri], sj=routeStops[rj];
+    if (![si[0],si[si.length-1]].includes(i)) return false;
+    if (![sj[0],sj[sj.length-1]].includes(j)) return false;
+    return routeLoad[ri]+routeLoad[rj] <= capacity;
+  }
+  function merge(i,j) {
+    let ri=routeOwner[i], rj=routeOwner[j];
+    let si=routeStops[ri].slice(), sj=routeStops[rj].slice();
+    if (si[0]===i) si.reverse();
+    if (sj[sj.length-1]===j) sj.reverse();
+    const merged=si.concat(sj);
+    routeStops[ri]=merged; routeLoad[ri]+=routeLoad[rj];
+    merged.forEach(c=>routeOwner[c]=ri);
+    delete routeStops[rj]; delete routeLoad[rj];
+  }
+  for (const [s,i,j] of savings) { if (s<=0) continue; if (canMerge(i,j)) merge(i,j); }
+  const vehicles=[];
+  for (const d of dedicated) vehicles.push({route:[d.stop], load:d.load, dist:Math.round(2*dist(depot,d.stop)), perStop:{[d.stop]:d.load}});
+  for (const owner in routeStops) {
+    const route=routeStops[owner];
+    const load=route.reduce((s,c)=>s+remaining[c],0);
+    let d=dist(depot,route[0]);
+    for (let k=0;k<route.length-1;k++) d+=dist(route[k],route[k+1]);
+    d+=dist(route[route.length-1],depot);
+    const perStop={};
+    route.forEach(c => { perStop[c] = Math.round(remaining[c]*10)/10; });
+    vehicles.push({route, load:Math.round(load*10)/10, dist:Math.round(d), perStop});
+  }
+  return vehicles;
+}
+/* สร้างข้อความบอกรายละเอียดผู้โดยสารแยกตามจุดจอดในเส้นทางเดียวกัน
+   เช่น "P16: 27 คน" (เที่ยวเต็มคันจุดเดียว) หรือ
+   "P14: 6.2 + P13: 10.0 + P16: 2.4 + P25: 3.2 คน" (เส้นทางรวมหลายจุด) */
+function buildStopBreakdown(route, perStop) {
+  return route.map(sid => `P${sid}: ${fmtP(perStop[sid]||0)} คน`).join(' + ');
+}
+
+function fiveMinSlots(n) {
+  const slotsAvail=12;
+  if (n<=0) return [];
+  if (n<=slotsAvail) {
+    let idxs=[]; for (let i=0;i<n;i++) idxs.push(Math.min(Math.round(i*slotsAvail/n), slotsAvail-1));
+    const seen=new Set(), result=[];
+    for (let idx of idxs) { while(seen.has(idx) && idx<slotsAvail-1) idx++; seen.add(idx); result.push(idx); }
+    return result.sort((a,b)=>a-b).map(i=>i*5);
+  } else {
+    const extra=n-slotsAvail;
+    const base=Array.from({length:slotsAvail},(_,i)=>i*5);
+    return base.concat(base.slice(0,extra)).sort((a,b)=>a-b);
+  }
+}
+/* เวลาออกก่อนปัดเป็นช่อง 0/5 นาที — กระจายแบบต่อเนื่อง (ทศนิยม) ตามจำนวนคันจริง */
+function rawSlotsContinuous(n) {
+  if (n<=0) return [];
+  const interval = 60/n;
+  return Array.from({length:n}, (_,i) => Math.round(i*interval*10)/10);
+}
+
+/* ================================================================
+   APP STATE
+   ================================================================ */
+let APP_STATE = { stopDemand: DEMO_DEMAND, scale: 0, matched:0, total:0, sourceLabel:'ข้อมูลตัวอย่าง (เทอม 1)' };
+let currentFormat = 'term1';
+let currentMode = 'demo';
+
+function recomputeScale() {
+  const dorm = Math.max(0, +document.getElementById('dormStudents').value || 0);
+  const parking = Math.max(0, +document.getElementById('motorcycleParking').value || 0);
+  const ceiling = Math.max(1, dorm - parking);
+  const percent = +document.getElementById('captivePercent').value || 100;
+  const target = Math.max(1, Math.round(ceiling * percent / 100));
+
+  document.getElementById('ceilingReadout').textContent = ceiling.toLocaleString();
+  document.getElementById('targetReadout').textContent = target.toLocaleString();
+
+  const raw = computeRawTotal(APP_STATE.stopDemand);
+  APP_STATE.scale = raw>0 ? target/raw*DAYS.length : 0;
+  APP_STATE.targetPop = target;
+}
+
+let FLEET = [{name:'รถบัสส้ม', count:16, cap:35}, {name:'รถกอล์ฟ', count:5, cap:11}]; /* ฝูงรถตามที่ผู้วิจัยระบุ: รถส้ม 16 คัน (35–40 ที่นั่ง) + รถกอล์ฟ 5 คัน (11–14 ที่นั่ง) = 21 คัน ใช้ค่าต่ำสุดของช่วง: 35 และ 11 ที่นั่ง = 615 ที่นั่ง */
+function fleetClean() { return FLEET.filter(f=>f.count>0 && f.cap>0); }
+function getFleetSize() { return Math.max(2, fleetClean().reduce((a,f)=>a+f.count,0)); }
+function getTotalSeats() { return Math.max(1, fleetClean().reduce((a,f)=>a+f.count*f.cap,0)); }
+function getCapacity() { return Math.max(1, getTotalSeats()/Math.max(1,fleetClean().reduce((a,f)=>a+f.count,0))); } /* ความจุเฉลี่ยถ่วงน้ำหนัก */
+function getMaxCapacity() { return Math.max(1, ...fleetClean().map(f=>f.cap)); }
+function assignVehicleTypes(vehicles) { /* Best-fit: โหลดมากสุดก่อน -> รถเล็กสุดที่ยังจุได้ */
+  const pool = fleetClean().map((f,ti)=>({name:f.name, cap:f.cap, left:f.count, ti})).sort((a,b)=>a.cap-b.cap);
+  const order = vehicles.map((v,i)=>i).sort((i,j)=>vehicles[j].load-vehicles[i].load);
+  const res = new Array(vehicles.length);
+  for (const i of order) {
+    const t = pool.find(p=>p.left>0 && p.cap>=vehicles[i].load-1e-9);
+    if (t) { t.left--; res[i]={name:t.name, cap:t.cap, over:false, ti:t.ti}; }
+    else { const big=pool[pool.length-1]; res[i]={name:big?big.name:'-', cap:big?big.cap:getMaxCapacity(), over:true, ti:-1}; }
+  }
+  return res;
+}
+function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderFleetEditor() {
+  document.getElementById('fleetEditor').innerHTML = FLEET.map((f,i)=>`
+    <div class="field-row" style="gap:8px;margin-top:6px;">
+      <input type="text" value="${esc(f.name)}" onchange="FLEET[${i}].name=this.value;onTargetChange()" style="flex:2;min-width:120px;" aria-label="ชื่อประเภทรถ">
+      <input type="number" value="${f.count}" min="0" step="1" onchange="FLEET[${i}].count=Math.max(0,+this.value||0);onTargetChange()" style="width:80px;" aria-label="จำนวนคัน"> คัน
+      <input type="number" value="${f.cap}" min="1" step="1" onchange="FLEET[${i}].cap=Math.max(1,+this.value||1);onTargetChange()" style="width:80px;" aria-label="ที่นั่งต่อคัน"> คน/คัน
+      <button type="button" onclick="removeFleetType(${i})" style="padding:4px 10px;cursor:pointer;" aria-label="ลบ">✕</button>
+    </div>`).join('');
+  updateFleetSummary();
+}
+function updateFleetSummary() {
+  const n=fleetClean().reduce((a,f)=>a+f.count,0);
+  document.getElementById('fleetSummary').textContent = `รวม ${n} คัน · ที่นั่งรวม ${getTotalSeats()} · ความจุเฉลี่ย ${getCapacity().toFixed(1)} คน/คัน · คันใหญ่สุด ${getMaxCapacity()} คน`+(n<2?' (ระบบใช้ขั้นต่ำ 2 คัน)':'');
+}
+function addFleetType(){ FLEET.push({name:'รถประเภทใหม่', count:1, cap:10}); renderFleetEditor(); onTargetChange(); }
+function removeFleetType(i){ if(FLEET.length>1){FLEET.splice(i,1);} renderFleetEditor(); onTargetChange(); }
+
+function onTargetChange() {
+  updateFleetSummary();
+  recomputeScale();
+  renderAll(); renderTimetable();
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  document.getElementById('panel-demo').classList.toggle('active', mode==='demo');
+  document.getElementById('panel-upload').classList.toggle('active', mode==='upload');
+  if (mode==='demo') {
+    APP_STATE.stopDemand = DEMO_DEMAND;
+    APP_STATE.sourceLabel = 'ข้อมูลตัวอย่าง (เทอม 1)';
+    recomputeScale();
+    populateSelectors();
+    renderAll(); renderTimetable();
+  }
+}
+function setFormat(fmt) {
+  currentFormat = fmt;
+  document.querySelectorAll('.format-tab').forEach(t=>t.classList.toggle('active', t.dataset.fmt===fmt));
+  document.getElementById('fileInput').accept = fmt==='term1' ? '.xlsx' : '.csv';
+  document.getElementById('uploadLabel').textContent = fmt==='term1' ? 'ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์ (.xlsx)' : 'ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์ (.csv)';
+}
+
+const dropZone = document.getElementById('dropZone');
+['dragover','dragleave','drop'].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    if (evt==='drop' && e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+});
+function showStatus(msg, type) {
+  const el = document.getElementById('uploadStatus');
+  el.textContent = msg; el.className = 'status-line '+type;
+}
+function handleFile(file) {
+  if (!file) return;
+  showStatus('กำลังประมวลผล...', 'ok');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      let segments=[];
+      if (currentFormat==='term1') {
+        const wb = XLSX.read(e.target.result, {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, range:4}).map(r=>r[0]).filter(Boolean);
+        segments = parseTerm1Text(rows).segments;
+      } else {
+        const result = Papa.parse(e.target.result, {skipEmptyLines:true});
+        segments = parseTerm2Rows(result.data.slice(1));
+      }
+      if (!segments.length) throw new Error('ไม่พบข้อมูลที่อ่านได้ในไฟล์นี้ กรุณาตรวจสอบรูปแบบไฟล์');
+      const roomFn = currentFormat==='term1' ? (seg)=>roomToBuildingTerm1(seg.room) : (seg)=>mapBuildingTerm2(seg.building);
+      const {stopDemand, matched, total} = computeStopDemand(segments, roomFn);
+      if (matched===0) throw new Error('อ่านไฟล์ได้ แต่จับคู่กับจุดจอดไม่ได้เลย กรุณาตรวจสอบรูปแบบไฟล์');
+      APP_STATE.stopDemand = stopDemand; APP_STATE.matched=matched; APP_STATE.total=total;
+      APP_STATE.sourceLabel = file.name;
+      recomputeScale();
+      populateSelectors();
+      renderAll(); renderTimetable();
+      showStatus('✅ อัปโหลดสำเร็จ', 'ok');
+    } catch (err) {
+      showStatus('❌ อัปโหลดไม่สำเร็จ: '+err.message, 'err');
+      console.error(err);
+    }
+  };
+  if (currentFormat==='term1') reader.readAsArrayBuffer(file);
+  else reader.readAsText(file);
+}
+
+function populateSelectors() {
+  const opts = DAYS.map(d=>`<option value="${d}">${d}</option>`).join('');
+  document.getElementById('daySelect').innerHTML = opts;
+  document.getElementById('ttDaySelect').innerHTML = opts;
+}
+
+/* ================================================================
+   MAP RENDERING
+   ================================================================ */
+function getStopTotalsForHour(day, hour) {
+  const totals = {};
+  if (!APP_STATE.stopDemand[day]) return totals;
+  for (const sid in APP_STATE.stopDemand[day]) {
+    const v = APP_STATE.stopDemand[day][sid][hour];
+    if (v) { const c = cellPeople(v); const t = c.g + c.r; if (t > 0) totals[sid] = t; }
+  }
+  return totals;
+}
+function renderAll() {
+  const day = document.getElementById('daySelect').value || DAYS[0];
+  const hour = +document.getElementById('hourSlider').value;
+  document.getElementById('hourDisplay').textContent = `${String(hour).padStart(2,'0')}:00`;
+  const totals = getStopTotalsForHour(day, hour);
+  const sum = Object.values(totals).reduce((a,b)=>a+b,0);
+  const fleet = getFleetSize();
+  const cap = getTotalSeats()*svcParams().rounds;
+  document.getElementById('mapStats').innerHTML = `
+    <div class="stat-cell"><div class="v">${sum.toFixed(0)}</div><div class="l">Demand รวม (คน)</div></div>
+    <div class="stat-cell"><div class="v">${(sum/cap*100).toFixed(0)}%</div><div class="l">อัตราใช้ความจุ</div></div>
+    <div class="stat-cell"><div class="v">${pickServiceVehicles(sum).n}${pickServiceVehicles(sum).short?'⚠':''}</div><div class="l">รถที่ควรวิ่ง (คัน จากทั้งหมด ${fleet})</div></div>
+    <div class="stat-cell"><div class="v">${Object.keys(totals).length}</div><div class="l">จุดจอดที่มีผู้โดยสาร</div></div>
+  `;
+  renderMap(totals);
+}
+
+function renderMap(totals) {
+  CURRENT_MAP_TOTALS = totals; // เก็บไว้ให้ tooltip เรียกใช้ตอน hover/click
+  const svg = document.getElementById('mapSvg');
+  const maxV = Math.max(1, ...Object.values(totals));
+  const xs = GEO_DATA.stops.map(s=>s.x), ys = GEO_DATA.stops.map(s=>s.y);
+  const minX=Math.min(...xs)-80, maxX=Math.max(...xs)+80, minY=Math.min(...ys)-80, maxY=Math.max(...ys)+80;
+  const W=maxX-minX, H=maxY-minY;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  function px(x){return x-minX;} function py(y){return H-(y-minY);}
+  let s='';
+  const roadColors={'แดง':'#D64550','เหลือง':'#C98A12'};
+  for (const road of GEO_DATA.roads) {
+    const pts = road.points.map(p=>`${px(p[0])},${py(p[1])}`).join(' ');
+    s += `<polyline points="${pts}" fill="none" stroke="${roadColors[road.name]||'#999'}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`;
+  }
+  function colorFor(frac) {
+    const stops=[[252,233,176],[242,169,59],[153,0,17]];
+    const seg = frac<0.5 ? [stops[0],stops[1],frac*2] : [stops[1],stops[2],(frac-0.5)*2];
+    const [c1,c2,t]=seg;
+    return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*t)},${Math.round(c1[1]+(c2[1]-c1[1])*t)},${Math.round(c1[2]+(c2[2]-c1[2])*t)})`;
+  }
+  for (const st of GEO_DATA.stops) {
+    const v = totals[st.id]||0;
+    const frac = v/maxV;
+    const r = st.id===0 ? 20 : 9+frac*32;
+    const color = st.id===0 ? '#13181F' : (v>0 ? colorFor(frac) : '#DCD6C8');
+    s += `<circle cx="${px(st.x)}" cy="${py(st.y)}" r="${r}" fill="${color}" stroke="#F6F3EC" stroke-width="2.5" style="cursor:pointer;" onmouseenter="showStopTooltip(${st.id}, event)" onmousemove="moveStopTooltip(event)" onmouseleave="hideStopTooltip()" onclick="showStopTooltip(${st.id}, event)"/>`;
+    if (v>maxV*0.12 || st.id===0) {
+      s += `<text x="${px(st.x)}" y="${py(st.y)+4}" text-anchor="middle" font-size="14" font-weight="700" font-family="Chakra Petch" fill="${st.id===0||frac>0.45?'white':'#333'}" style="pointer-events:none;">${st.id===0?'P0':'P'+st.id}</text>`;
+    }
+  }
+  svg.innerHTML = s;
+  renderStopRank(totals);
+}
+function rankColor(frac) {
+  const stops=[[252,233,176],[242,169,59],[153,0,17]];
+  const seg = frac<0.5 ? [stops[0],stops[1],frac*2] : [stops[1],stops[2],(frac-0.5)*2];
+  const [c1,c2,t]=seg;
+  return `rgb(${Math.round(c1[0]+(c2[0]-c1[0])*t)},${Math.round(c1[1]+(c2[1]-c1[1])*t)},${Math.round(c1[2]+(c2[2]-c1[2])*t)})`;
+}
+/* อันดับจุดจอดที่ Demand สูงสุดในชั่วโมงที่เลือก — ใช้ค่า totals ชุดเดียวกับที่วาดบนแผนที่ ไม่มีการคำนวณใหม่ */
+function renderStopRank(totals) {
+  const el = document.getElementById('stopRank'); if (!el) return;
+  const list = Object.keys(totals).map(k=>({id:+k, v:totals[k]})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  if (!list.length) { el.innerHTML = '<div class="rank-head">จุดจอดที่ Demand สูงสุดในชั่วโมงนี้</div><div class="rank-foot">ไม่มี Demand ในชั่วโมงนี้</div>'; return; }
+  const total = list.reduce((a,b)=>a+b.v,0);
+  const top = list.slice(0,10), maxV = top[0].v;
+  const topSum = top.reduce((a,b)=>a+b.v,0);
+  el.innerHTML = `<div class="rank-head">จุดจอดที่ Demand สูงสุดในชั่วโมงนี้ (ประมาณ)</div>` +
+    top.map((x,i) => `<div class="rank-row">
+      <span class="rk">${i+1}</span><span class="sid">${x.id===0?'P0':'P'+x.id}</span>
+      <span class="rank-bar"><i style="width:${(x.v/maxV*100).toFixed(1)}%;background:${rankColor(x.v/maxV)}"></i></span>
+      <span class="rv">${x.v.toFixed(0)} คน<small>${(x.v/total*100).toFixed(0)}%</small></span></div>`).join('') +
+    `<div class="rank-foot">${top.length} อันดับแรกรวม ${(topSum/total*100).toFixed(0)}% ของ Demand ชั่วโมงนี้ (${total.toFixed(0)} คน) · ค่าประมาณจากตารางเรียน ไม่ใช่ผู้โดยสารที่นับได้</div>`;
+}
+
+/* ================================================================
+   MAP TOOLTIP — hover/tap a stop to see connected buildings,
+   current demand, and an estimated number of vehicles for that stop
+   ================================================================ */
+let CURRENT_MAP_TOTALS = {};
+const STOP_TO_BUILDINGS = {};
+(function buildReverseBuildingMap() {
+  for (const bName in GEO_DATA.building_to_stop) {
+    const sid = GEO_DATA.building_to_stop[bName];
+    if (!STOP_TO_BUILDINGS[sid]) STOP_TO_BUILDINGS[sid] = [];
+    STOP_TO_BUILDINGS[sid].push(bName);
+  }
+})();
+
+function showStopTooltip(stopId, evt) {
+  const tip = document.getElementById('mapTooltip');
+  const demand = CURRENT_MAP_TOTALS[stopId] || 0;
+  const totalDemand = Object.values(CURRENT_MAP_TOTALS).reduce((a,b)=>a+b,0);
+  const pct = totalDemand > 0 ? (demand/totalDemand*100).toFixed(1) : '0.0';
+  const buildings = STOP_TO_BUILDINGS[stopId] || [];
+  const capacity = getCapacity();
+  const vehiclesNeeded = demand > 0 ? Math.max(1, Math.ceil(demand / capacity)) : 0;
+  const label = stopId === 0 ? 'P0 (จุดต้นทาง/หอใน)' : `P${stopId}`;
+
+  const buildingsHtml = buildings.length
+    ? buildings.map(b => `<span class="tooltip-chip">${b}</span>`).join('')
+    : '<span style="color:var(--muted);font-size:11.5px;">ไม่มีอาคารเชื่อมกับจุดนี้โดยตรง</span>';
+
+  tip.innerHTML = `
+    <div class="tooltip-title">${label} <span style="float:right;font-size:11px;color:#6B7280;font-weight:400;">✕ ปิด</span></div>
+    <div class="tooltip-row"><span>ผู้โดยสาร ณ เวลานี้</span><b>${demand.toFixed(0)} คน</b></div>
+    <div class="tooltip-row"><span>สัดส่วนของ Demand รวม</span><b>${pct}%</b></div>
+    <div class="tooltip-row"><span>รถที่ควรไปรับจุดนี้โดยประมาณ</span><b>${vehiclesNeeded > 0 ? vehiclesNeeded + ' คัน' : '—'}</b></div>
+    <div class="tooltip-buildings-label">อาคารที่รวมมาที่จุดนี้</div>
+    <div class="tooltip-buildings">${buildingsHtml}</div>
+  `;
+  tip.style.display = 'block';
+  moveStopTooltip(evt);
+}
+
+function moveStopTooltip(evt) {
+  const tip = document.getElementById('mapTooltip');
+  if (tip.style.display !== 'block') return;
+  const pad = 14;
+  let x = evt.clientX + pad;
+  let y = evt.clientY + pad;
+  const tw = tip.offsetWidth || 260, th = tip.offsetHeight || 140;
+  if (x + tw > window.innerWidth - 10) x = evt.clientX - tw - pad;
+  if (y + th > window.innerHeight - 10) y = evt.clientY - th - pad;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+
+function hideStopTooltip() {
+  document.getElementById('mapTooltip').style.display = 'none';
+}
+
+/* ================================================================
+   TIMETABLE (Service-Need Rule + CVRP) — v3
+   หลักการจัดตาราง:
+   1) Demand แต่ละหน่วยถูกจัดรถครั้งเดียว: CVRP ช่วงเช้ารับ "ขาไปของคาบ 08:00" และ CVRP ช่วงเย็นรับ "ขากลับ
+      ที่ถึงป้ายชั่วโมง 16:00" ส่วนรถวนเส้นทางรับเฉพาะ Demand ส่วนที่เหลือของแต่ละชั่วโมง
+   2) รถที่ติดงาน CVRP (ช่วงเวลาออก-กลับ) ถูกกันออกจากรถวนในชั่วโมงที่เวลาทับซ้อน (ถ้าทับแม้เพียงบางส่วนของชั่วโมง
+      ถือว่าไม่ว่างทั้งชั่วโมง = สมมติฐานแบบระมัดระวัง) รถคันเดียวจึงไม่ถูกจัดซ้อนสองงาน
+   3) เวลาออก CVRP คำนวณย้อนจากเวลาที่ต้องถึง โดยใช้ความเร็วเฉลี่ยและเวลาจอดต่อจุด (ค่าสมมติ ยังไม่ได้วัดจริง)
+   ================================================================ */
+let LAST_TIMETABLE = [];
+let LAST_FLEETCHECK = [];
+let LAST_VEHICLE_HOURS = 0;
+let LAST_DAY_TOTAL = 0;
+let LAST_CVRP = {am:null, pm:null};
+function schedParams() {
+  const lead = +(document.getElementById('goingLead')||{value:30}).value || 0;
+  const speed = Math.max(5, +(document.getElementById('speedKmh')||{value:40}).value || 40);
+  const dwell = Math.max(0, +(document.getElementById('dwellSec')||{value:20}).value || 0) / 60; /* นาที */
+  return {lead, speed, dwell};
+}
+function hhmm(m) { m = Math.round(m); return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function routeTimes(route, sp) {
+  const mpm = sp.speed*1000/60;
+  const first = dist(0, route[0]);
+  let d = first;
+  for (let k=0;k<route.length-1;k++) d += dist(route[k], route[k+1]);
+  const toLast = d/mpm + sp.dwell*route.length;
+  const back = dist(route[route.length-1], 0)/mpm;
+  return {toFirst: first/mpm, toLast, round: toLast + back};
+}
+function buildFullDayTimetable(day) {
+  const rows = [];
+  const sp = schedParams();
+  const rounds = svcParams().rounds;
+  const useCvrp = (document.getElementById('useCvrp')||{checked:true}).checked; /* ปิด = ไม่สร้างเที่ยว CVRP ทุกชั่วโมงใช้รถวนแดง/เหลือง */
+  const fleetTypes = fleetClean();
+  const fleetTotal = fleetTypes.reduce((a,f)=>a+f.count,0);
+  const hourlyTotal = {};
+  for (let h=6; h<=21; h++) {
+    const t = getStopTotalsForHour(day, h);
+    hourlyTotal[h] = Object.values(t).reduce((a,b)=>a+b,0);
+  }
+  LAST_DAY_TOTAL = Object.values(hourlyTotal).reduce((a,b)=>a+b,0);
+  LAST_CVRP = {am:null, pm:null};
+  const jobs = [];            /* งาน CVRP ที่ทำให้รถไม่ว่าง: {start,end,ti} (นาทีของวัน) */
+  const served = {};          /* Demand ที่ CVRP รับไปแล้ว แยกตามชั่วโมงที่ถูกนับ */
+  const carry = {};           /* ปิด CVRP: ขาไปของคาบ 08:00 ที่ v3 ให้ CVRP รับก่อน 08:00 → จัดเป็นเที่ยวรถวนช่วง 07:xx แทน (Demand รวมเท่าเดิม) */
+  const addServed = (h, v) => { served[h] = (served[h]||0) + v; };
+
+  /* ---- CVRP เช้า: ขาไปของคาบ 08:00 ต้องถึงจุดจอดก่อนคาบ (08:00 - lead) ---- */
+  /* รับ Demand ขาไปเท่าที่แบบจำลองนับไว้ในชั่วโมงนั้นของสถานการณ์ที่เลือก (0 นาที: ชั่วโมง 8 นับที่เวลาเริ่มคาบ; 15 หรือ 30 นาที: ชั่วโมง 7 นับล่วงหน้า)
+     เพื่อไม่ให้หน่วย Demand ใดถูกรับซ้ำโดยรถวนในชั่วโมงถัดไป */
+  const amHour = sp.lead>=15 ? 7 : 8;
+  const amKey = sp.lead>=30 ? 'goingC' : (sp.lead>=15 ? 'goingB' : 'going');
+  const amDemand = {};
+  if (APP_STATE.stopDemand[day]) for (const sid in APP_STATE.stopDemand[day]) {
+    const v = APP_STATE.stopDemand[day][sid][amHour];
+    if (v && v[amKey]>0) amDemand[sid] = peopleOf(v[amKey]*APP_STATE.scale);
+  }
+  if (useCvrp && Object.keys(amDemand).length) {
+    const vehicles = solveCVRP(amDemand, 0, getMaxCapacity()).sort((a,b)=>b.load-a.load);
+    const vt = assignVehicleTypes(vehicles);
+    const arriveBy = 8*60 - sp.lead;
+    vehicles.forEach((v,i) => {
+      const tm = routeTimes(v.route, sp);
+      /* lead 30: ผู้โดยสารมาถึง P0 ก่อนคาบ 30 นาที รถออกตามนาทีที่มาถึง (07:30 สำหรับคาบ 08:00) ส่วน lead อื่น คำนวณย้อนจากเวลาที่ต้องถึงจุดสุดท้าย */
+      const depart = (sp.lead>=30) ? Math.floor((8*60 - sp.lead)/5)*5 : Math.floor((arriveBy - tm.toLast)/5)*5;
+      jobs.push({start:depart, end:depart+tm.round, ti:vt[i].over?-1:vt[i].ti});
+      const breakdown = buildStopBreakdown(v.route, v.perStop) + ` · ถึงจุดสุดท้าย ~${hhmm(depart+tm.toLast)} น.`;
+      rows.push({time:hhmm(depart), type:v.route.length>1?'cvrp':'express', label:'P0 → '+v.route.map(s=>'P'+s).join(' → ')+' → P0', breakdown, perStop:v.perStop, load:v.load, cap:vt[i].cap, vehicle:vt[i].name, over:vt[i].over});
+    });
+    addServed(amHour, Object.values(amDemand).reduce((a,b)=>a+b,0));
+    LAST_CVRP.am = {D:Object.values(amDemand).reduce((a,b)=>a+b,0), routes:vehicles.map((v,i)=>({route:v.route, load:v.load, dist:v.dist, over:vt[i].over}))};
+  } else if (!useCvrp && amHour === 8 && Object.keys(amDemand).length) {
+    const D = Object.values(amDemand).reduce((a,b)=>a+b,0);
+    addServed(8, D); carry[7] = (carry[7]||0) + D;
+  }
+
+  /* ---- CVRP เย็น: ขากลับที่ถึงป้ายชั่วโมง 16:00 รถต้องถึงจุดแรกเมื่อ 16:00 ---- */
+  const pmDemand = {};
+  if (APP_STATE.stopDemand[day]) for (const sid in APP_STATE.stopDemand[day]) {
+    const v = APP_STATE.stopDemand[day][sid][16];
+    if (v && v.return>0) pmDemand[sid] = peopleOf(v.return*APP_STATE.scale);
+  }
+  if (useCvrp && Object.keys(pmDemand).length) {
+    const vehicles = solveCVRP(pmDemand, 0, getMaxCapacity()).sort((a,b)=>b.load-a.load);
+    const vt = assignVehicleTypes(vehicles);
+    vehicles.forEach((v,i) => {
+      const tm = routeTimes(v.route, sp);
+      const depart = Math.floor((16*60 - tm.toFirst)/5)*5;
+      jobs.push({start:depart, end:depart+tm.round, ti:vt[i].over?-1:vt[i].ti});
+      const breakdown = buildStopBreakdown(v.route, v.perStop);
+      rows.push({time:hhmm(depart), type:v.route.length>1?'cvrp':'express', label:'P0 ← '+v.route.map(s=>'P'+s).join(' ← ')+' ← P0', breakdown, perStop:v.perStop, load:v.load, cap:vt[i].cap, vehicle:vt[i].name, over:vt[i].over});
+    });
+    addServed(16, Object.values(pmDemand).reduce((a,b)=>a+b,0));
+    LAST_CVRP.pm = {D:Object.values(pmDemand).reduce((a,b)=>a+b,0), routes:vehicles.map((v,i)=>({route:v.route, load:v.load, dist:v.dist, over:vt[i].over}))};
+  }
+
+  /* ---- รถวนเส้นทาง: Demand ส่วนที่ CVRP ยังไม่ได้รับ และรถที่ว่างจริงในชั่วโมงนั้น ---- */
+  LAST_FLEETCHECK = []; LAST_VEHICLE_HOURS = 0;
+  const loopHours = useCvrp ? [8,9,10,11,12,13,14,15,16,17,18,19] : [7,8,9,10,11,12,13,14,15,16,17,18,19]; /* ปิด CVRP: ช่วง 07:00 ใช้รถวนเหมือนชั่วโมงอื่น */
+  for (let h=7; h<=19; h++) {
+    const busyJobs = jobs.filter(j => j.start < (h+1)*60 && j.end > h*60);
+    const busyByType = {}; let busyN = 0;
+    busyJobs.forEach(j => { busyN++; if (j.ti>=0) busyByType[j.ti] = (busyByType[j.ti]||0)+1; });
+    let loopN = 0, short = false, demandLoop = 0;
+    if (loopHours.includes(h)) {
+      demandLoop = Math.max(0, hourlyTotal[h] - (served[h]||0)) + (carry[h]||0);
+      const avail = [];
+      fleetTypes.forEach((f,ti) => { const free = Math.max(0, f.count - (busyByType[ti]||0)); for (let i=0;i<free;i++) avail.push({name:f.name, cap:f.cap, ti}); });
+      const sv = pickServiceVehicles(demandLoop, avail);
+      loopN = sv.n; short = sv.short;
+      const n = Math.max(1, Math.round(sv.n*rounds)); /* ไม่จำกัดเที่ยวต่อชั่วโมง: จำนวนเที่ยวมาจากกฎจำนวนรถ × รอบ (ถ้าเกิน 12 เที่ยว บางเที่ยวออกนาทีเดียวกัน) */
+      const avgLoad = peopleOf(demandLoop/n);
+      const rounded = fiveMinSlots(n);
+      const raw = rawSlotsContinuous(n);
+      rounded.forEach((m,i) => {
+        const rawM = raw[i];
+        const rawH = h + Math.floor(rawM/60);
+        const rawMinPart = (rawM%60).toFixed(1).padStart(4,'0');
+        rows.push({
+          time:`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,
+          rawTime:`${String(rawH).padStart(2,'0')}:${rawMinPart}`,
+          type:i%2===0?'loop-r':'loop-y',
+          label:i%2===0?'วนเส้นทาง — สายสีแดง':'วนเส้นทาง — สายสีเหลือง',
+          load:avgLoad, cap:sv.avgCap, isAvg:true, carCount:sv.n, departures:n, short:sv.short, interval:Math.round(60/n*10)/10,
+        });
+      });
+    }
+    const inService = busyN + loopN;
+    LAST_VEHICLE_HOURS += inService;
+    LAST_FLEETCHECK.push({hour:h, cvrpBusy:busyN, loopN, demandLoop, inService, short, ok: inService<=fleetTotal && !short});
+  }
+  rows.sort((a,b)=>a.time.localeCompare(b.time));
+  assignCvrpSigns(rows);
+  return rows;
+}
+/* ================================================================
+   เที่ยวรถตามสีรถ (เพิ่มจาก v3 — เป็นการจัดกลุ่มและแสดงผลของแถวเดิมเท่านั้น ไม่แตะการคำนวณใด ๆ)
+   สี = สีป้ายที่ติดหน้ารถ (รถทุกคันเปลี่ยนป้ายได้):
+     แดง / เหลือง = เที่ยววนเส้นทาง (type loop-r / loop-y ตามที่ v3 สลับไว้)
+     น้ำเงิน      = เที่ยว CVRP/Express ที่ไปเฉพาะ P16 และ/หรือ P26
+     แดง / เหลือง = เที่ยว CVRP ที่รวมจุดอื่นด้วย (v4: กำหนดสีป้ายตามสายที่จุดจอดของเที่ยวนั้นอยู่ ดู assignCvrpSigns)
+   ================================================================ */
+const COLOUR_ORDER = ['red','yellow','blue','none'];
+const COLOUR_META = {red:{name:'แดง'}, yellow:{name:'เหลือง'}, blue:{name:'น้ำเงิน'}, none:{name:'ไม่ระบุสี'}};
+const BLUE_STOPS = [16, 26];
+let TT_COLOUR = 'all';
+function tripStops(r) {
+  return ((r.label||'').match(/P(\d+)/g) || []).map(x=>+x.slice(1)).filter(n=>n!==0);
+}
+/* v4: เที่ยว CVRP ที่ไม่ใช่ป้ายน้ำเงิน → แดงหรือเหลือง
+   จุดจอดแยกตามสายที่อยู่ใกล้ (ห่างเส้นทาง ≤ 30 ม. จากไฟล์ GIS road.geojson × point.geojson):
+     ใกล้สายแดงอย่างเดียว  = P15, P23, P24
+     ใกล้สายเหลืองอย่างเดียว = P6, P7, P18, P19
+     ที่เหลือใกล้ทั้งสองสาย
+   กติกา (เรียงตามลำดับ)
+     1) เที่ยวที่มีจุดแดงอย่างเดียวและไม่มีจุดเหลืองอย่างเดียว → แดง
+     2) เที่ยวที่มีจุดเหลืองอย่างเดียวและไม่มีจุดแดงอย่างเดียว → เหลือง
+     3) ทุกจุดอยู่ใกล้ทั้งสองสาย → สลับแดง/เหลืองตามลำดับเวลาออก (เริ่มแดง) เพื่อให้สองสายใช้เท่า ๆ กัน
+     4) มีทั้งจุดแดงอย่างเดียวและเหลืองอย่างเดียวในเที่ยวเดียว → ใช้สีของสายที่มีผู้โดยสารมากกว่า
+        และแจ้งจุดที่อยู่นอกสายนั้นในแถว (ผู้โดยสารที่จุดนั้นต้องเดินไปยังเส้นทางของสายนั้น)
+   สีนี้คือสีป้ายที่ติดหน้ารถ ไม่ได้เปลี่ยนเส้นทางที่ CVRP คำนวณ */
+const RED_ONLY_STOPS = [15, 23, 24];
+const YEL_ONLY_STOPS = [6, 7, 18, 19];
+function assignCvrpSigns(rows) {
+  let alt = 0;
+  rows.forEach(r => {
+    delete r.sign; delete r.signNote;
+    if (r.type !== 'cvrp' && r.type !== 'express') return;
+    const st = tripStops(r);
+    if (st.length && st.every(n => BLUE_STOPS.includes(n))) { r.sign = 'blue'; r.signNote = 'ไปเฉพาะ P16/P26'; return; }
+    const ps = r.perStop || {};
+    const redS = st.filter(n => RED_ONLY_STOPS.includes(n));
+    const yelS = st.filter(n => YEL_ONLY_STOPS.includes(n));
+    const nm = a => a.map(n => 'P' + n).join(', ');
+    if (redS.length && !yelS.length) { r.sign = 'red'; r.signNote = 'ผ่านจุดที่อยู่ใกล้สายแดงอย่างเดียว (' + nm(redS) + ')'; }
+    else if (yelS.length && !redS.length) { r.sign = 'yellow'; r.signNote = 'ผ่านจุดที่อยู่ใกล้สายเหลืองอย่างเดียว (' + nm(yelS) + ')'; }
+    else if (!redS.length && !yelS.length) {
+      r.sign = (alt++ % 2 === 0) ? 'red' : 'yellow';
+      r.signNote = 'ทุกจุดอยู่ใกล้ทั้งสองสาย จึงสลับแดง/เหลือง';
+    } else {
+      const lr = redS.reduce((a, n) => a + (ps[n] || 0), 0), ly = yelS.reduce((a, n) => a + (ps[n] || 0), 0);
+      if (lr === ly) { r.sign = (alt++ % 2 === 0) ? 'red' : 'yellow'; }
+      else r.sign = lr > ly ? 'red' : 'yellow';
+      const off = r.sign === 'red' ? yelS : redS;
+      r.signNote = '⚠ แวะ ' + nm(off) + ' ซึ่งอยู่นอกสาย' + (r.sign === 'red' ? 'แดง' : 'เหลือง') + ' (เลือกสีตามผู้โดยสารที่มากกว่า)';
+    }
+  });
+}
+function tripColour(r) {
+  if (r.type === 'loop-r') return 'red';
+  if (r.type === 'loop-y') return 'yellow';
+  if (r.sign) return r.sign;
+  const st = tripStops(r);
+  return (st.length && st.every(n=>BLUE_STOPS.includes(n))) ? 'blue' : 'none';
+}
+/* ตารางเดินรถไฟฟ้าของมหาวิทยาลัยนเรศวร วันจันทร์–ศุกร์ (ตารางปัจจุบัน) อ่านจากภาพตารางเดินรถ นับเที่ยวต่อชั่วโมง [แดง, เหลือง]
+   รวมแดง 78 + เหลือง 78 = 156 เที่ยว ตารางสายเหลืองพิมพ์ 08.05 ซ้ำ ถือเป็น 08.15 (จำนวนเที่ยวต่อชั่วโมงไม่เปลี่ยน)
+   ไม่มีเที่ยวหลัง 18:59 ข้อมูลที่ผู้วิจัยให้ ไม่ใช่ผลแบบจำลอง ควรยืนยันกับตารางฉบับที่ประกาศใช้จริง */
+const UNIV_SCHEDULE = {7:[6,6], 8:[6,6], 9:[6,6], 10:[6,6], 11:[6,6], 12:[12,11], 13:[6,6], 14:[8,9], 15:[6,6], 16:[6,6], 17:[6,6], 18:[4,4]};
+function currentScheduleByHour() {
+  const out = {};
+  for (const h in UNIV_SCHEDULE) out[h] = {red:UNIV_SCHEDULE[h][0], yellow:UNIV_SCHEDULE[h][1]};
+  return out;
+}
+function setTtColour(c) {
+  TT_COLOUR = (c !== 'all' && TT_COLOUR === c) ? 'all' : c;
+  renderTimetable();
+}
+function renderColourPanel(rows) {
+  const hrsOf = rows.map(r=>+r.time.slice(0,2));
+  const lo = Math.min(7, ...hrsOf), hi = Math.max(19, ...hrsOf);
+  const H = []; for (let h=lo; h<=hi; h++) H.push(h);
+  const by = {}, agg = {};
+  COLOUR_ORDER.forEach(c => { by[c] = {}; agg[c] = {n:0, load:0, cap:0}; });
+  rows.forEach(r => {
+    const c = tripColour(r), h = +r.time.slice(0,2);
+    by[c][h] = (by[c][h]||0) + 1;
+    agg[c].n++;
+    if (r.load != null && r.cap != null) { agg[c].load += r.load; agg[c].cap += r.cap; }
+  });
+  if (TT_COLOUR !== 'all' && !agg[TT_COLOUR].n) TT_COLOUR = 'all';
+  const SHOWN = COLOUR_ORDER.filter(c => agg[c].n > 0);
+  let maxCell = 1;
+  SHOWN.forEach(c => H.forEach(h => { if ((by[c][h]||0) > maxCell) maxCell = by[c][h]; }));
+
+  const card = (key, name, n, sub, cls) => `
+    <button type="button" class="colour-card ${cls}" aria-pressed="${TT_COLOUR===key}" ${n?'' :'disabled'} onclick="setTtColour('${key}')">
+      <span class="cc-name">${key==='all'?'':'<span class="cdot"></span>'}${name}</span>
+      <span class="cc-n">${n}<small>เที่ยว</small></span>
+      <span class="cc-sub">${sub}</span>
+    </button>`;
+  const cards = card('all', 'ทั้งหมด', rows.length, 'ทุกสีรวมกัน (กดสีเพื่อกรองตารางด้านล่าง)', '') +
+    SHOWN.map(c => {
+      const a = agg[c];
+      const sub = a.n ? `ผู้โดยสาร ~${fmtP(a.load/a.n)} คน/เที่ยว · ใช้ความจุ ~${a.cap>0?(a.load/a.cap*100).toFixed(0):'-'}% (ประมาณ)` : 'ไม่มีเที่ยวในวันนี้';
+      return card(c, COLOUR_META[c].name, a.n, sub, 'c-'+c);
+    }).join('');
+
+  const cur = currentScheduleByHour();
+  const curTot = {red:0, yellow:0};
+  Object.keys(cur).forEach(h => { curTot.red += cur[h].red; curTot.yellow += cur[h].yellow; });
+  const lanes = SHOWN.map(c => {
+    const cells = H.map(h => {
+      const n = by[c][h] || 0;
+      return n ? `<td class="has" style="--a:${(0.16 + 0.44*n/maxCell).toFixed(2)}">${n}</td>` : `<td class="zero">·</td>`;
+    }).join('');
+    return `<tr class="c-${c}"><th scope="row"><span class="lane-name"><span class="cdot"></span>${COLOUR_META[c].name}</span></th>${cells}<td class="tot">${agg[c].n}</td></tr>`;
+  }).join('');
+  const refCells = H.map(h => cur[h] ? `<td>${cur[h].red}+${cur[h].yellow}</td>` : `<td class="zero">·</td>`).join('');
+  const refRow = `<tr class="ref"><th scope="row">ตารางปัจจุบัน ม.<small>แดง+เหลือง ตามภาพตารางเดินรถของมหาวิทยาลัย (156 เที่ยว)</small></th>${refCells}<td class="tot">${curTot.red}+${curTot.yellow}</td></tr>`;
+
+  document.getElementById('ttColour').innerHTML = `
+    <div class="colour-cards" role="group" aria-label="กรองเที่ยวรถตามสีรถ">${cards}</div>
+    <div class="lane-scroll"><table class="lane-grid">
+      <caption>จำนวนเที่ยวต่อชั่วโมงแยกตามสีรถ (ตัวเลขในช่อง = จำนวนเที่ยว · ยิ่งเข้มยิ่งมาก) เทียบกับตารางปัจจุบัน</caption>
+      <thead><tr><th style="text-align:left;padding-left:12px;">สีรถ</th>${H.map(h=>`<th>${String(h).padStart(2,'0')}</th>`).join('')}<th>รวม</th></tr></thead>
+      <tbody>${lanes}${refRow}</tbody>
+    </table></div>`;
+  return agg;
+}
+function useCvrpNow() { return !!(document.getElementById('useCvrp')||{checked:true}).checked; }
+const COLOUR_HINT_ON = '<b>สีรถ</b> = สีป้ายที่ติดหน้ารถ (รถทุกคันเปลี่ยนป้ายได้) · <b>แดง/เหลือง</b> = เที่ยววนเส้นทาง ซึ่งแบบจำลองสลับแดง–เหลืองตามลำดับเที่ยวในแต่ละชั่วโมง และเที่ยว CVRP ที่แวะหลายจุด ซึ่งกำหนดสีตามสายที่จุดจอดของเที่ยวนั้นอยู่ (จุดที่ใกล้ทั้งสองสายสลับแดง/เหลือง; ดูเหตุผลใต้ชื่อเส้นทางของแต่ละเที่ยว) · <b>น้ำเงิน</b> = เที่ยวที่ไปเฉพาะ P16 และ/หรือ P26 · สีป้ายไม่เปลี่ยนเส้นทางที่ CVRP คำนวณ · จำนวนผู้โดยสารและการใช้ความจุเป็นค่าประมาณจากแบบจำลอง ยังไม่ได้ทดสอบว่าช่วยลดเวลารอหรือผู้โดยสารตกค้าง';
+const COLOUR_HINT_OFF = '<b>สีรถ</b> = สีป้ายที่ติดหน้ารถ (รถทุกคันเปลี่ยนป้ายได้) · ทุกเที่ยวเป็นรถวนเส้นทาง ผู้โดยสารขึ้นลงได้ทุกจุดระหว่างทาง แบบจำลองสลับ <b>แดง–เหลือง</b> ตามลำดับเที่ยวในแต่ละชั่วโมง · ผู้โดยสารขาไปของคาบ 08:00 ถูกจัดไว้ในเที่ยว 07:xx ตามหลักเดียวกับที่ v3 ใช้กับเที่ยวเช้า (ถ้าขาไปมาถึงก่อนคาบ 15 หรือ 30 นาที จะเลื่อนทุกชั่วโมงอยู่แล้ว) · ยังไม่มีเที่ยว<b>ป้ายน้ำเงิน</b> (P16/P26) เพราะยังไม่ได้กำหนดกติกาเที่ยวพิเศษ · ผู้โดยสารและการใช้ความจุเป็นค่าประมาณจากแบบจำลอง ยังไม่ได้ทดสอบว่าช่วยลดเวลารอหรือผู้โดยสารตกค้าง';
+function renderTimetable() {
+  document.body.classList.toggle('no-cvrp', !useCvrpNow());
+  document.getElementById('colourHint').innerHTML = useCvrpNow() ? COLOUR_HINT_ON : COLOUR_HINT_OFF;
+  const day = document.getElementById('ttDaySelect').value || DAYS[0];
+  const rows = buildFullDayTimetable(day);
+  LAST_TIMETABLE = rows;
+  document.getElementById('ttStats').innerHTML = `
+    <div class="stat-cell"><div class="v">${rows.length}</div><div class="l">รอบรถทั้งวัน</div></div>
+    ${useCvrpNow()?`<div class="stat-cell"><div class="v">${rows.filter(r=>r.type==='cvrp'||r.type==='express').length}</div><div class="l">รอบแบบ CVRP</div></div>`:''}
+    <div class="stat-cell"><div class="v">${day}</div><div class="l">วันที่แสดง</div></div>
+    <div class="stat-cell"><div class="v">${LAST_DAY_TOTAL.toFixed(0)}</div><div class="l">Demand ทั้งวัน (คน${roundUpOn()?' · หลังปัดขึ้น':' · ไม่ปัด'})</div></div>
+    <div class="stat-cell"><div class="v">${LAST_VEHICLE_HOURS}</div><div class="l">ชั่วโมงรถ 07-19 น. (วิ่งครบฝูง = ${getFleetSize()*13})</div></div>
+    <div class="stat-cell"><div class="v">${LAST_FLEETCHECK.every(x=>x.ok)?'ผ่าน':'⚠ เกิน/ไม่พอ'}</div><div class="l">${useCvrpNow()?'ตรวจรถไม่ซ้อนงาน':'ตรวจรถวนไม่เกินที่มี'}${LAST_FLEETCHECK.filter(x=>!x.ok).map(x=>' '+x.hour+':00').join(',')}</div></div>
+  `;
+  renderColourPanel(rows);
+  const showRaw = document.getElementById('showRawTime').checked;
+  const grouped = document.getElementById('groupByColour').checked;
+  let view = rows.map(r => ({r, c: tripColour(r)}));
+  if (TT_COLOUR !== 'all') view = view.filter(x => x.c === TT_COLOUR);
+  if (grouped) view = view.map((x,i)=>({...x, i})).sort((a,b) => (COLOUR_ORDER.indexOf(a.c) - COLOUR_ORDER.indexOf(b.c)) || (a.i - b.i));
+  const pillClass = {'loop-r':'loop-r','loop-y':'loop-y',cvrp:'cvrp',express:'express'};
+  const headRow = document.getElementById('ttHeadRow');
+  headRow.innerHTML = showRaw
+    ? `<th>เวลาก่อนปัด</th><th>เวลาออก (ปัดแล้ว)</th><th>สีรถ</th><th>ประเภท / เส้นทาง</th><th>ผู้โดยสาร</th><th>ใช้ความจุ</th>`
+    : `<th>เวลาออก</th><th>สีรถ</th><th>ประเภท / เส้นทาง</th><th>ผู้โดยสาร</th><th>ใช้ความจุ</th>`;
+  document.getElementById('ttBody').innerHTML = view.length ? view.map(({r, c}) => {
+    const rawCell = r.rawTime
+      ? `<td style="color:var(--muted);">${r.rawTime} น.</td>`
+      : `<td style="color:var(--muted);">—</td>`;
+    const breakdownHtml = r.breakdown
+      ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;">รับ: ${r.breakdown}</div>`
+      : (r.isAvg ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;">รับตลอดเส้นทาง (ประมาณเฉลี่ย ไม่ใช่ค่าจริงต่อจุด) · ใช้รถ ${r.carCount} คัน${r.short?' <b style="color:#C6373C">⚠ Demand เกินความจุทั้งฝูง</b>':''}</div>` : '');
+    const vehHtml = r.vehicle ? `<div style="font-size:11px;margin-top:3px;">🚌 ${esc(r.vehicle)} (${r.cap} คน)${r.over?' <b style="color:#C6373C">⚠ รถไม่พอ/จุไม่พอ</b>':''}</div>` : '';
+    const signHtml = r.signNote ? `<div style="font-size:11px;color:var(--muted);margin-top:3px;">ป้าย${COLOUR_META[c].name}: ${r.signNote}</div>` : '';
+    const routeCell = `<td>${r.label} <span class="route-pill ${pillClass[r.type]||''}">${r.type}</span>${vehHtml}${breakdownHtml}${signHtml}</td>`;
+    const colourCell = `<td><span class="colour-pill c-${c}"><span class="cdot"></span>${COLOUR_META[c].name}</span></td>`;
+    const loadText = r.load!=null ? fmtP(r.load)+' คน'+(r.isAvg?' (เฉลี่ย)':'') : '—';
+    const pctText = r.cap!=null ? (r.load/r.cap*100).toFixed(0)+'%' : '—';
+    return showRaw
+      ? `<tr class="tr-trip c-${c}">${rawCell}<td><b>${r.time}</b></td>${colourCell}${routeCell}
+         <td>${loadText}</td><td>${pctText}</td></tr>`
+      : `<tr class="tr-trip c-${c}"><td><b>${r.time}</b></td>${colourCell}${routeCell}
+         <td>${loadText}</td><td>${pctText}</td></tr>`;
+  }).join('') : `<tr><td colspan="${showRaw?6:5}" class="tt-empty">ไม่มีเที่ยวสีนี้ในวันที่เลือก</td></tr>`;
+}
+/* ดาวน์โหลด CSV: หน้าที่เผยแพร่ไม่มีสิทธิ์สั่งดาวน์โหลดเอง จึงใช้ความสามารถ downloads (ผู้ชมกดยืนยันก่อนบันทึก)
+   ถ้าใช้ไม่ได้ (เช่น เปิดไฟล์ในเครื่อง) จะคัดลอกตารางไปคลิปบอร์ดแบบคั่นด้วยแท็บ วางลงใน Excel/Sheets ได้ทันที
+   ถ้าคัดลอกไม่ได้อีก จะแสดงข้อความในกล่องให้คัดลอกเอง */
+async function downloadTimetableCSV() {
+  if (!LAST_TIMETABLE.length) return;
+  const st = document.getElementById('csvStatus'), box = document.getElementById('csvFallback');
+  const say = m => { st.textContent = m; };
+  const day = document.getElementById('ttDaySelect').value || '';
+  const head = ['เวลาก่อนปัด','เวลาออก','ประเภท','เส้นทาง','ผู้โดยสาร','ใช้ความจุ','สีรถ','เหตุผลสี'];
+  const rows = LAST_TIMETABLE.map(r => [r.rawTime||'', r.time, r.type, r.label, r.load!=null?fmtP(r.load):'', r.cap!=null?(r.load/r.cap*100).toFixed(0)+'%':'', COLOUR_META[tripColour(r)].name, r.signNote||'']);
+  const q = v => '"'+String(v).replace(/"/g,'""')+'"';
+  const csv = [head,...rows].map(r => r.map(q).join(',')).join('\n')+'\n';
+  const tsv = [head,...rows].map(r => r.map(v => String(v).replace(/[\t\r\n]+/g,' ')).join('\t')).join('\n')+'\n';
+  box.hidden = true;
+  let dl = null;
+  try { dl = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
+  if (dl) {
+    try {
+      await dl.save({filename:'nu-shuttle-timetable-'+day+'.csv', data:'\uFEFF'+csv});
+      say('บันทึกไฟล์แล้ว'); return;
+    } catch (e) {
+      if (e && e.code === 'declined') { say('ยกเลิกการบันทึก'); return; }
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(tsv);
+    say('บันทึกเป็นไฟล์ในหน้านี้ไม่ได้ จึงคัดลอกตารางไปคลิปบอร์ดแล้ว วางลงใน Excel หรือ Google Sheets ได้เลย');
+  } catch (e) {
+    box.value = tsv; box.hidden = false; box.focus(); box.select();
+    say('คัดลอกอัตโนมัติไม่ได้ เลือกข้อความในกล่องด้านล่างแล้วคัดลอกเอง');
+  }
+}
+
+/* ================================================================
+   LIVE CLOCK
+   ================================================================ */
+function tickClock() {
+  const now = new Date();
+  document.getElementById('clockTime').textContent = now.toLocaleTimeString('th-TH', {hour12:false});
+  document.getElementById('clockDate').textContent = now.toLocaleDateString('th-TH', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+}
+setInterval(() => { tickClock(); }, 1000);
+
+/* ================================================================
+   INIT
+   ================================================================ */
+tickClock();
+renderFleetEditor();
+recomputeScale();
+populateSelectors();
+renderAll();
+renderTimetable();
+</script>
+</body>
+</html>
+
+</body></html>
